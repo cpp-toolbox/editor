@@ -208,6 +208,7 @@ int main(int argc, char *argv[]) {
                 if (current_mode == MOVE_AND_EDIT) {
                     viewport.create_new_line_at_cursor_and_scroll_down();
                     current_mode = INSERT;
+		    mode_change_signal.toggle_state();
                 }
                 break;
             case GLFW_KEY_BACKSPACE:
@@ -290,11 +291,11 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        if (mode_change_signal.has_just_changed()) {
-            auto selected_color = mode_to_cursor_color[current_mode];
-            shader_cache.set_uniform(ShaderType::ABSOLUTE_POSITION_WITH_SOLID_COLOR, ShaderUniformVariable::RGBA_COLOR,
-                                     selected_color);
-        }
+	if (should_replace) {
+	    auto selected_color = mode_to_cursor_color[current_mode];
+	    shader_cache.set_uniform(ShaderType::ABSOLUTE_POSITION_WITH_SOLID_COLOR, ShaderUniformVariable::RGBA_COLOR,
+				     selected_color);
+	}
 
         if (current_mode == VISUAL_SELECT) {
             int visual_col_delta = -(viewport.active_buffer_col_under_cursor - col_where_selection_mode_started);

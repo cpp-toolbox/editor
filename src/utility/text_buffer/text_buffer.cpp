@@ -70,13 +70,14 @@ bool LineTextBuffer::insert_character(int line_index, int col_index, char charac
         return false;
     }
     if (col_index > lines[line_index].size()) {
-        std::cerr << "Error: Column index out of bounds.\n";
-        return false;
+        // If col_index is greater than the current line size, insert spaces up to col_index
+        lines[line_index].resize(col_index, ' ');
     }
     lines[line_index].insert(col_index, 1, character);
     edit_signal.toggle_state();
     return true;
 }
+
 
 bool LineTextBuffer::delete_line(int line_index) {
     if (line_index >= lines.size()) {
