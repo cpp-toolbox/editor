@@ -1,0 +1,15 @@
+[requires]
+glfw/3.4
+glad/0.1.36
+spdlog/1.14.1
+glm/cci.20230113
+stb/cci.20230920
+nlohmann_json/3.11.3
+assimp/5.4.3
+
+[generators]
+CMakeDeps
+CMakeToolchain
+
+[layout]
+cmake_layout

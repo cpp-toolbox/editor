@@ -1,0 +1,48 @@
+[submodule "scripts"]
+	path = scripts
+	url = git@github.com:cpp-toolbox/scripts.git
+[submodule "src/graphics/batcher"]
+	path = src/graphics/batcher
+	url = git@github.com:cpp-toolbox/batcher.git
+[submodule "src/graphics/shader_cache"]
+	path = src/graphics/shader_cache
+	url = git@github.com:cpp-toolbox/shader_cache.git
+[submodule "src/graphics/vertex_geometry"]
+	path = src/graphics/vertex_geometry
+	url = git@github.com:cpp-toolbox/vertex_geometry.git
+[submodule "src/graphics/shader_standard"]
+	path = src/graphics/shader_standard
+	url = git@github.com:cpp-toolbox/shader_standard.git
+[submodule "src/utility/logger_component"]
+	path = src/utility/logger_component
+	url = git@github.com:cpp-toolbox/logger_component.git
+[submodule "src/graphics/window"]
+	path = src/graphics/window
+	url = git@github.com:cpp-toolbox/window.git
+[submodule "assets/shaders"]
+	path = assets/shaders
+	url = git@github.com:cpp-toolbox/shaders.git
+[submodule "src/graphics/ui"]
+	path = src/graphics/ui
+	url = git@github.com:cpp-toolbox/ui.git
+[submodule "src/graphics/font_atlas"]
+	path = src/graphics/font_atlas
+	url = git@github.com:cpp-toolbox/font_atlas.git
+[submodule "src/graphics/draw_info"]
+	path = src/graphics/draw_info
+	url = git@github.com:cpp-toolbox/draw_info.git
+[submodule "src/utility/unique_id_generator"]
+	path = src/utility/unique_id_generator
+	url = git@github.com:cpp-toolbox/unique_id_generator.git
+[submodule "src/utility/temporal_binary_signal"]
+	path = src/utility/temporal_binary_signal
+	url = git@github.com:cpp-toolbox/temporal_binary_signal.git
+[submodule "src/graphics/texture_atlas"]
+	path = src/graphics/texture_atlas
+	url = git@github.com:cpp-toolbox/texture_atlas.git
+[submodule "src/graphics/transform"]
+	path = src/graphics/transform
+	url = git@github.com:cpp-toolbox/transform.git
+[submodule "src/utility/glfw_lambda_callback_manager"]
+	path = src/utility/glfw_lambda_callback_manager
+	url = git@github.com:cpp-toolbox/glfw_lambda_callback_manager.git

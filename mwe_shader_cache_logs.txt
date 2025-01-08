@@ -1,0 +1,11 @@
+[2025-01-08 14:32:10.298] [shader cache] [info] creating new shader program
+[2025-01-08 14:32:10.311] [shader cache] [info] Successfully linked shader program
+[2025-01-08 14:32:10.311] [shader cache] [info] creating new shader program
+[2025-01-08 14:32:10.312] [shader cache] [info] Successfully linked shader program
+[2025-01-08 14:32:10.312] [shader cache] [info] Logging Created Shaders:
+[2025-01-08 14:32:10.312] [shader cache] [info] Total shaders: 2
+[2025-01-08 14:32:10.312] [shader cache] [info] Shader Type: absolute_position_with_solid_color, Program ID: 4
+[2025-01-08 14:32:10.312] [shader cache] [info] Shader Type: absolute_position_textured, Program ID: 1
+[2025-01-08 14:32:10.356] [shader cache] [info] Binding vertex attribute xyz_position
+[2025-01-08 14:32:10.431] [shader cache] [info] Binding vertex attribute xyz_position
+[2025-01-08 14:32:10.471] [shader cache] [info] Binding vertex attribute passthrough_texture_coordinate

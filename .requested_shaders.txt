@@ -1,0 +1,2 @@
+absolute_position_with_solid_color
+absolute_position_textured
