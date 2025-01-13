@@ -2,27 +2,88 @@
 
 #include <cctype> // For std::isalnum
 
-Viewport::Viewport(LineTextBuffer &buffer, int cursor_line_offset, int cursor_col_offset)
-    : buffer(buffer), active_buffer_line_under_cursor(0), active_buffer_col_under_cursor(0),
-      cursor_line_offset(cursor_line_offset), cursor_col_offset(cursor_col_offset) {}
+Viewport::Viewport(LineTextBuffer &buffer, int num_lines, int num_cols, int cursor_line_offset, int cursor_col_offset)
+    : buffer(buffer), cursor_line_offset(cursor_line_offset), num_lines(num_lines), num_cols(num_cols),
+      cursor_col_offset(cursor_col_offset), active_buffer_line_under_cursor(0), active_buffer_col_under_cursor(0),
+      selection_mode_on(false) {
+
+    // Initialize the previous_state with the same dimensions as the viewport
+    previous_state.resize(num_lines, std::vector<char>(num_cols, ' '));
+}
+
+void Viewport::tick() {
+    // Update the previous state with the current content
+    update_previous_state();
+}
+
+bool Viewport::has_cell_changed(int line, int col) const {
+    // Check if the given cell has changed by comparing current symbol with the previous state
+    if (line >= 0 && line < num_lines && col >= 0 && col < num_cols) {
+        return get_symbol_at(line, col) != previous_state[line][col];
+    }
+    return false; // If the line/col are out of bounds, return false
+}
+
+std::vector<std::pair<int, int>> Viewport::get_changed_cells_since_last_tick() const {
+    std::vector<std::pair<int, int>> changed_cells;
+
+    // Iterate over the visible area of the buffer and compare with the previous state
+    for (int line = 0; line < num_lines; ++line) {
+        for (int col = 0; col < num_cols; ++col) {
+            char current_symbol = get_symbol_at(line, col);
+
+            // If the symbol has changed, mark this cell as changed
+            if (current_symbol != previous_state[line][col]) {
+                changed_cells.emplace_back(line, col);
+            }
+        }
+    }
+
+    return changed_cells;
+}
+
+void Viewport::update_previous_state() {
+    for (int line = 0; line < num_lines; ++line) {
+        for (int col = 0; col < num_cols; ++col) {
+            previous_state[line][col] = get_symbol_at(line, col);
+        }
+    }
+}
+
+void Viewport::scroll(int line_delta, int col_delta) {
+    active_buffer_line_under_cursor += line_delta;
+    active_buffer_col_under_cursor += col_delta;
+    moved_signal.toggle_state();
+}
 
 void Viewport::scroll_up() {
-    --active_buffer_line_under_cursor;
-    moved_signal.toggle_state();
+    scroll(-1, 0); // Scroll up decreases the row by 1
 }
 
 void Viewport::scroll_down() {
-    ++active_buffer_line_under_cursor;
-    moved_signal.toggle_state();
+    scroll(1, 0); // Scroll down increases the row by 1
 }
 
 void Viewport::scroll_left() {
-    --active_buffer_col_under_cursor;
-    moved_signal.toggle_state();
+    scroll(0, -1); // Scroll left decreases the column by 1
 }
 
 void Viewport::scroll_right() {
-    ++active_buffer_col_under_cursor;
+    scroll(0, 1); // Scroll right increases the column by 1
+}
+
+void Viewport::set_active_buffer_line_col_under_cursor(int line, int col) {
+    active_buffer_line_under_cursor = line;
+    active_buffer_col_under_cursor = col;
+    moved_signal.toggle_state();
+};
+
+void Viewport::set_active_buffer_line_under_cursor(int line) {
+    active_buffer_line_under_cursor = line;
+    moved_signal.toggle_state();
+}
+void Viewport::set_active_buffer_col_under_cursor(int col) {
+    active_buffer_col_under_cursor = col;
     moved_signal.toggle_state();
 }
 
@@ -30,10 +91,24 @@ char Viewport::get_symbol_at(int line, int col) const {
     int line_index = active_buffer_line_under_cursor + line - cursor_line_offset;
     int column_index = active_buffer_col_under_cursor + col - cursor_col_offset;
 
-    if (line_index < buffer.line_count()) {
-        const std::string &line = buffer.get_line(line_index);
-        if (column_index < line.size()) {
-            return line[column_index];
+    // Check if the line index is within bounds
+    if (line_index < buffer.line_count() && line_index >= 0) {
+        if (column_index < 0) {
+            // Handle negative column indices: Render line number
+            std::string line_number = std::to_string(line_index + 1) + "|";
+            int line_number_index = column_index + line_number.size();
+
+            if (line_number_index >= 0) {
+                return line_number[line_number_index];
+            } else {
+                return ' '; // Placeholder for out-of-bounds negative positions
+            }
+        } else {
+            // Handle non-negative column indices: Render buffer content
+            const std::string &line_content = buffer.get_line(line_index);
+            if (column_index < line_content.size()) {
+                return line_content[column_index];
+            }
         }
     }
     return ' '; // Placeholder for out-of-bounds positions
@@ -65,40 +140,92 @@ bool Viewport::insert_character_at(int line, int col, char character) {
     return false;
 }
 
+void Viewport::move_cursor_forward_until_end_of_word() {
+    active_buffer_col_under_cursor =
+        buffer.find_forward_to_end_of_word(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
+    moved_signal.toggle_state();
+}
+
 void Viewport::move_cursor_forward_by_word() {
+    active_buffer_col_under_cursor =
+        buffer.find_forward_by_word_index(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
+    moved_signal.toggle_state();
+}
+
+void Viewport::move_cursor_backward_until_start_of_word() {
+    active_buffer_col_under_cursor =
+        buffer.find_backward_to_start_of_word(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
+    moved_signal.toggle_state();
+}
+
+void Viewport::move_cursor_backward_by_word() {
+    active_buffer_col_under_cursor =
+        buffer.find_backward_by_word_index(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
+    moved_signal.toggle_state();
+}
+
+bool Viewport::delete_line_at_cursor() {
+    // Get the current cursor position
+    int line_index = active_buffer_line_under_cursor;
+
+    // Ensure the line index is valid within the buffer's bounds
+    if (line_index < 0 || line_index >= buffer.line_count()) {
+        return false;
+    }
+
+    // Delete the line at the current cursor position
+    if (!buffer.delete_line(line_index)) {
+        return false;
+    }
+
+    // Optionally: Adjust the viewport or cursor position after deletion
+    // For example, move the cursor to the previous line after deletion.
+    /*if (line_index > 0) {*/
+    /*    scroll_up();*/
+    /*}*/
+
+    return true;
+}
+
+void Viewport::move_cursor_to_start_of_line() {
     int line_index = active_buffer_line_under_cursor;
 
     if (line_index < buffer.line_count()) {
-        const std::string &line = buffer.get_line(line_index);
-
-        // Skip alphanumeric characters
-        while (active_buffer_col_under_cursor < line.size() && std::isalnum(line[active_buffer_col_under_cursor])) {
-            ++active_buffer_col_under_cursor;
-        }
-
-        // Skip non-alphanumeric characters
-        while (active_buffer_col_under_cursor < line.size() && !std::isalnum(line[active_buffer_col_under_cursor])) {
-            ++active_buffer_col_under_cursor;
-        }
+        active_buffer_col_under_cursor = 0; // Move the cursor to the start of the line
     }
 
     moved_signal.toggle_state();
 }
 
-void Viewport::move_cursor_backward_by_word() {
+bool Viewport::insert_tab_at_cursor() {
+    // Insert a tab at the current cursor position in the buffer
+    bool insert_result = buffer.insert_tab(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
+
+    // If insertion is successful, perform scrolling
+    if (insert_result) {
+        scroll(0, 4); // Scroll down by 4 lines
+    }
+
+    return insert_result; // Return the result of the insert operation
+}
+
+void Viewport::move_cursor_to_end_of_line() {
     int line_index = active_buffer_line_under_cursor;
+
     if (line_index < buffer.line_count()) {
         const std::string &line = buffer.get_line(line_index);
+        active_buffer_col_under_cursor = line.size(); // Move the cursor to the end of the line
+    }
 
-        // Skip non-alphanumeric characters backward
-        while (active_buffer_col_under_cursor > 0 && !std::isalnum(line[active_buffer_col_under_cursor - 1])) {
-            --active_buffer_col_under_cursor;
-        }
+    moved_signal.toggle_state();
+}
 
-        // Skip alphanumeric characters backward
-        while (active_buffer_col_under_cursor > 0 && std::isalnum(line[active_buffer_col_under_cursor - 1])) {
-            --active_buffer_col_under_cursor;
-        }
+void Viewport::move_cursor_to_middle_of_line() {
+    int line_index = active_buffer_line_under_cursor;
+
+    if (line_index < buffer.line_count()) {
+        const std::string &line = buffer.get_line(line_index);
+        active_buffer_col_under_cursor = line.size() / 2; // Move the cursor to the middle of the line
     }
 
     moved_signal.toggle_state();
@@ -112,9 +239,6 @@ bool Viewport::create_new_line_at_cursor_and_scroll_down() {
     if (line_index < 0 || line_index > buffer.line_count()) {
         return false;
     }
-
-    // Create a new blank line at the specified position
-    std::string new_line = "";
 
     // Insert the new line at the correct position in the buffer
     if (!buffer.insert_blank_line(line_index + 1)) {
@@ -135,6 +259,18 @@ bool Viewport::insert_character_at_cursor(char character) {
     if (buffer.insert_character(active_buffer_line_under_cursor, active_buffer_col_under_cursor, character)) {
         // Adjust the cursor column offset to move right after insertion
         scroll_right();
+        return true; // Insertion successful
+    }
+
+    return false; // Insertion failed (e.g., invalid position)
+}
+
+bool Viewport::insert_string_at_cursor(const std::string &str) {
+
+    // Attempt to insert the string into the buffer
+    if (buffer.insert_string(active_buffer_line_under_cursor, active_buffer_col_under_cursor, str)) {
+        // Adjust the cursor column offset to move right after the string insertion
+        scroll(0, str.size());
         return true; // Insertion successful
     }
 
