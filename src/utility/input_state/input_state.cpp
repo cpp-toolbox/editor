@@ -261,7 +261,6 @@ InputState::InputState() {
                                {Key::SPACE, "space"},
                                {Key::GRAVE_ACCENT, "~"},
 
-                               {Key::ZERO, "0"},
                                {Key::ONE, "1"},
                                {Key::TWO, "2"},
                                {Key::THREE, "3"},
@@ -271,6 +270,9 @@ InputState::InputState() {
                                {Key::SEVEN, "7"},
                                {Key::EIGHT, "8"},
                                {Key::NINE, "9"},
+                               {Key::ZERO, "0"},
+                               {Key::MINUS, "-"},
+
 
                                {Key::EXCLAMATION_POINT, "!"},
                                {Key::AT_SIGN, "@"},
@@ -282,6 +284,14 @@ InputState::InputState() {
                                {Key::ASTERISK, "*"},
                                {Key::LEFT_PARENTHESIS, "("},
                                {Key::RIGHT_PARENTHESIS, ")"},
+                               {Key::UNDERSCORE, "_"},
+                               {Key::PLUS, "+"},
+
+                               {Key::COMMA, ","},
+                               {Key::PERIOD, "."},
+                               {Key::PERIOD, "."},
+                               {Key::LESS_THAN, "<"},
+                               {Key::GREATER_THAN, ">"},
 
                                {Key::CAPS_LOCK, "caps_lock"},
                                {Key::ESCAPE, "escape"},

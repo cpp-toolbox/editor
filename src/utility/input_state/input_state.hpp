@@ -73,7 +73,6 @@ enum class Key {
     SPACE,
     GRAVE_ACCENT,
 
-    ZERO,
     ONE,
     TWO,
     THREE,
@@ -83,6 +82,8 @@ enum class Key {
     SEVEN,
     EIGHT,
     NINE,
+    ZERO,
+    MINUS,
 
     EXCLAMATION_POINT,
     AT_SIGN,
@@ -96,6 +97,11 @@ enum class Key {
     RIGHT_PARENTHESIS,
     UNDERSCORE,
     PLUS,
+
+    COMMA,
+    PERIOD,
+    LESS_THAN,
+    GREATER_THAN,
 
     CAPS_LOCK,
     ESCAPE,
