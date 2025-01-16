@@ -46,3 +46,9 @@
 [submodule "src/utility/glfw_lambda_callback_manager"]
 	path = src/utility/glfw_lambda_callback_manager
 	url = git@github.com:cpp-toolbox/glfw_lambda_callback_manager.git
+[submodule "src/graphics/colors"]
+	path = src/graphics/colors
+	url = git@github.com:cpp-toolbox/colors.git
+[submodule "src/utility/fs_utils"]
+	path = src/utility/fs_utils
+	url = git@github.com:cpp-toolbox/fs_utils.git

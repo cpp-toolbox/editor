@@ -15,7 +15,34 @@ enum class KeyType {
     SYMBOL,
 };
 
-enum class Key {
+enum class EKey {
+    a,
+    b,
+    c,
+    d,
+    e,
+    f,
+    g,
+    h,
+    i,
+    j,
+    k,
+    l,
+    m,
+    n,
+    o,
+    p,
+    q,
+    r,
+    s,
+    t,
+    u,
+    v,
+    w,
+    x,
+    y,
+    z,
+
     A,
     B,
     C,
@@ -43,35 +70,9 @@ enum class Key {
     Y,
     Z,
 
-    CAPITAL_A,
-    CAPITAL_B,
-    CAPITAL_C,
-    CAPITAL_D,
-    CAPITAL_E,
-    CAPITAL_F,
-    CAPITAL_G,
-    CAPITAL_H,
-    CAPITAL_I,
-    CAPITAL_J,
-    CAPITAL_K,
-    CAPITAL_L,
-    CAPITAL_M,
-    CAPITAL_N,
-    CAPITAL_O,
-    CAPITAL_P,
-    CAPITAL_Q,
-    CAPITAL_R,
-    CAPITAL_S,
-    CAPITAL_T,
-    CAPITAL_U,
-    CAPITAL_V,
-    CAPITAL_W,
-    CAPITAL_X,
-    CAPITAL_Y,
-    CAPITAL_Z,
-
     SPACE,
     GRAVE_ACCENT,
+    TILDE,
 
     ONE,
     TWO,
@@ -84,6 +85,7 @@ enum class Key {
     NINE,
     ZERO,
     MINUS,
+    EQUAL,
 
     EXCLAMATION_POINT,
     AT_SIGN,
@@ -97,6 +99,12 @@ enum class Key {
     RIGHT_PARENTHESIS,
     UNDERSCORE,
     PLUS,
+
+    LEFT_SQUARE_BRACKET,
+    RIGHT_SQUARE_BRACKET,
+
+    LEFT_CURLY_BRACKET,
+    RIGHT_CURLY_BRACKET,
 
     COMMA,
     PERIOD,
@@ -117,9 +125,13 @@ enum class Key {
     DOWN,
 
     SLASH,
+    QUESTION_MARK,
     BACKSLASH,
+    PIPE,
     COLON,
     SEMICOLON,
+    SINGLE_QUOTE,
+    DOUBLE_QUOTE,
 
     LEFT_SHIFT,
     RIGHT_SHIFT,
@@ -130,18 +142,30 @@ enum class Key {
     LEFT_SUPER,
     RIGHT_SUPER,
 
+    FUNCTION_KEY,
+    MENU_KEY,
+
     LEFT_MOUSE_BUTTON,
     RIGHT_MOUSE_BUTTON,
     MIDDLE_MOUSE_BUTTON,
     SCROLL_UP,
     SCROLL_DOWN,
 
-    DUMMY_COUNT
+    // the dummy is used as the "biggest value" so that we can iterate through this.
+    DUMMY
 };
 
-Key get_shifted_key(Key key);
-
-KeyType get_key_type(Key key);
+class Key {
+  public:
+    EKey key_enum;
+    KeyType key_type;
+    int glfw_code;
+    std::string string_repr;
+    bool requires_modifer_to_be_typed = true;
+    bool shiftable = false;
+    EKey key_enum_of_shifted_version = EKey::DUMMY;
+    TemporalBinarySignal pressed_signal;
+};
 
 // the reason why we have this is so that we can query the entire keyboard and mouse state in a very simple way.
 class InputState {
@@ -149,15 +173,16 @@ class InputState {
     InputState();
     ~InputState() = default;
 
+    bool is_just_pressed(EKey key_enum);
+    bool is_pressed(EKey key_enum);
+
+    std::string get_string_state();
+
+    std::vector<Key> all_keys;
     std::set<int> glfw_keycodes;
-    std::unordered_map<Key, TemporalBinarySignal> key_to_state;
-    // key maps
-    std::unordered_map<Key, std::string> key_to_key_string;
-    std::unordered_map<std::string, Key> key_string_to_key;
-    std::unordered_map<Key, int> key_to_glfw_code;
-    std::unordered_map<int, Key> glfw_code_to_key;
-    std::unordered_set<std::string> allowed_key_strings;
-    std::unordered_set<int> allowed_glfw_codes;
+    // pointers to the keys in all_keys
+    std::unordered_map<EKey, Key *> key_enum_to_object;
+    std::unordered_map<int, Key *> glfw_code_to_key;
 };
 
 #endif // INPUT_STATE

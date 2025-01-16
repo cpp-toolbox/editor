@@ -1,18 +1,29 @@
 // ABOUTODO
-// need to get change word in there and so on
+// idk why renderdoc doesn't work rn, look at that later
+// generalize how the regex matching works.
+// add change background color and text color of an entry
+// add logic for going up and down in the search menu
+// add in multiple textbuffers for a viewport
+// eventually get to highlighting, later on though check out
+// https://tree-sitter.github.io/tree-sitter/3-syntax-highlighting.html
+// check out temp/tree_sitter_...
 
 #include <algorithm>
 #include <fmt/core.h>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <rapidfuzz/fuzz.hpp>
 
+#include "graphics/ui/ui.hpp"
 #include "graphics/window/window.hpp"
 #include "graphics/shader_cache/shader_cache.hpp"
 #include "graphics/batcher/generated/batcher.hpp"
 #include "graphics/vertex_geometry/vertex_geometry.hpp"
 #include "graphics/texture_atlas/texture_atlas.hpp"
 #include "graphics/viewport/viewport.hpp"
+#include "graphics/colors/colors.hpp"
 
+#include "utility/fs_utils/fs_utils.hpp"
 #include "utility/input_state/input_state.hpp"
 #include "utility/glfw_lambda_callback_manager/glfw_lambda_callback_manager.hpp"
 #include "utility/limited_vector/limited_vector.hpp"
@@ -33,6 +44,8 @@
 #include <iostream>
 #include <filesystem>
 #include <cstdio>
+
+Colors colors;
 
 /**
  * Gets the directory of the executable.
@@ -91,8 +104,15 @@ class AutomaticKeySequenceCommandRunner {
     bool command_started = false;
 
     bool potentially_run_normal_mode_command(std::string partial_command, Viewport &viewport, EditorMode &editor_mode,
-                                             TemporalBinarySignal &mode_change_signal, GLFWwindow *window) {
+                                             TemporalBinarySignal &mode_change_signal, GLFWwindow *window,
+                                             bool &fs_browser_is_active) {
         // Command must be more than one character to proceed
+        //
+
+        if (partial_command == "rew") {
+            fs_browser_is_active = true;
+            return true;
+        }
 
         // Handle special commands 'dd' and 'yy'
         if (partial_command == "dd") {
@@ -244,8 +264,8 @@ class AutomaticKeySequenceCommandRunner {
     }
 };
 
-unsigned int SCREEN_WIDTH = 1366;
-unsigned int SCREEN_HEIGHT = 768;
+unsigned int SCREEN_WIDTH = 700;
+unsigned int SCREEN_HEIGHT = 700;
 
 void adjust_uv_coordinates_in_place(std::vector<glm::vec2> &uv_coords, float horizontal_push, float top_push,
                                     float bottom_push) {
@@ -409,8 +429,367 @@ void render(Viewport &viewport, Grid &screen_grid, Grid &status_bar_grid, Grid &
                                                                              center_ivs.vertices);
     }
 
+    monospaced_font_atlas.bind_texture();
     batcher.absolute_position_textured_shader_batcher.draw_everything();
     batcher.absolute_position_with_solid_color_shader_batcher.draw_everything();
+}
+
+void setup_sdf_shader_uniforms(ShaderCache &shader_cache) {
+    auto text_color = glm::vec3(0.5, 0.5, 1);
+    float char_width = 0.5;
+    float edge_transition = 0.1;
+
+    shader_cache.use_shader_program(ShaderType::TRANSFORM_V_WITH_SIGNED_DISTANCE_FIELD_TEXT);
+
+    shader_cache.set_uniform(ShaderType::TRANSFORM_V_WITH_SIGNED_DISTANCE_FIELD_TEXT, ShaderUniformVariable::TRANSFORM,
+                             glm::mat4(1.0f));
+
+    shader_cache.set_uniform(ShaderType::TRANSFORM_V_WITH_SIGNED_DISTANCE_FIELD_TEXT, ShaderUniformVariable::RGB_COLOR,
+                             text_color);
+
+    shader_cache.set_uniform(ShaderType::TRANSFORM_V_WITH_SIGNED_DISTANCE_FIELD_TEXT,
+                             ShaderUniformVariable::CHARACTER_WIDTH, char_width);
+
+    shader_cache.set_uniform(ShaderType::TRANSFORM_V_WITH_SIGNED_DISTANCE_FIELD_TEXT,
+                             ShaderUniformVariable::EDGE_TRANSITION_WIDTH, edge_transition);
+    shader_cache.stop_using_shader_program();
+}
+
+template <typename Iterable>
+std::vector<std::pair<std::string, double>> find_matching_files(const std::string &query, const Iterable &files,
+                                                                size_t result_limit) {
+    // Initialize results vector
+    std::vector<std::pair<std::string, double>> results;
+
+    // Use CachedRatio for efficient repeated comparisons
+    rapidfuzz::fuzz::CachedRatio<char> scorer(query);
+
+    // Debugging setup
+    spdlog::debug("Starting file matching with query: '{}' and result limit: {}", query, result_limit);
+
+    for (const auto &file : files) {
+        // Calculate similarity score
+        double score = scorer.similarity(file.string());
+
+        // Log the file and score
+        spdlog::debug("File: '{}', Score: {:.2f}", file.string(), score);
+
+        // Add all files with their scores to the results
+        results.emplace_back(file.string(), score);
+    }
+
+    // Sort results by similarity in descending order
+    std::sort(results.begin(), results.end(), [](const auto &a, const auto &b) { return a.second > b.second; });
+
+    spdlog::debug("Sorting completed. Total files evaluated: {}", results.size());
+
+    // Trim the results to the specified limit
+    if (results.size() > result_limit) {
+        results.resize(result_limit);
+        spdlog::debug("Trimmed results to the top {} files.", result_limit);
+    }
+
+    return results;
+}
+
+void update_search_results(std::string &fs_browser_search_query, std::vector<std::filesystem::path> &searchable_files,
+                           FileBrowser &fb,
+                           std::vector<int> &doids_for_textboxes_for_active_directory_for_later_removal, UI &fs_browser,
+                           TemporalBinarySignal &search_results_changed_signal, int &selected_file_doid,
+                           std::vector<std::string> &currently_matched_files) {
+    // Find matching files
+    int file_limit = 10;
+    std::vector<std::pair<std::string, double>> matching_files =
+        find_matching_files(fs_browser_search_query, searchable_files, file_limit);
+
+    // here we update the list in the UI, but the thing is the ui is screwed up rn so how to do?
+    // Display results
+    if (matching_files.empty()) {
+        std::cout << "No matching files found for query: \"" << fs_browser_search_query << "\"." << std::endl;
+    } else {
+        Grid file_rows(matching_files.size(), 1, fb.main_file_view_rect);
+        auto file_rects = file_rows.get_column(0);
+
+        // clear out old data
+        for (auto doid : doids_for_textboxes_for_active_directory_for_later_removal) {
+            fs_browser.remove_textbox(doid);
+        }
+        doids_for_textboxes_for_active_directory_for_later_removal.clear();
+
+        // TODO this is a bad way to do things, use the replace function later on
+        fs_browser.remove_textbox(selected_file_doid);
+        selected_file_doid = fs_browser.add_textbox(fs_browser_search_query, fb.file_selection_bar, colors.gray40);
+
+        // clear out old data
+
+        // note during this process we delete the old ones and load in the new, so no need to replace.
+        // TODO we need to ad da function to remove data from the batcher to make this "complete"
+        int i = 0;
+        std::cout << "Matching Files (Sorted by Similarity):" << std::endl;
+
+        // clear out old results
+
+        currently_matched_files.clear();
+        for (const auto &[file, score] : matching_files) {
+            std::cout << file << " (Score: " << score << ")" << std::endl;
+            int oid = fs_browser.add_textbox(file, file_rects.at(i), colors.grey);
+            doids_for_textboxes_for_active_directory_for_later_removal.push_back(oid);
+            currently_matched_files.push_back(file);
+            i++;
+        }
+        search_results_changed_signal.toggle_state();
+    }
+}
+
+void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBinarySignal &mode_change_signal,
+                   Viewport &viewport, AutomaticKeySequenceCommandRunner &move_and_edit_arcr,
+                   int &line_where_selection_mode_started, int &col_where_selection_mode_started,
+                   std::vector<SubTextIndex> &search_results, int &current_search_index, std::string &command_bar_input,
+                   TemporalBinarySignal &command_bar_input_signal, GLFWwindow *window, bool &is_search_active,
+                   bool &fs_browser_is_active, std::string &fs_browser_search_query,
+                   std::vector<std::filesystem::path> &searchable_files, FileBrowser &fb,
+                   std::vector<int> &doids_for_textboxes_for_active_directory_for_later_removal, UI &fs_browser,
+                   TemporalBinarySignal &search_results_changed_signal, int &selected_file_doid,
+                   std::vector<std::string> &currently_matched_files) {
+
+    // making life easier one keystroke at a time.
+    std::function<bool(EKey)> jp = [&](EKey k) { return input_state.is_just_pressed(k); };
+    std::function<bool(EKey)> ip = [&](EKey k) { return input_state.is_pressed(k); };
+
+    std::vector<std::string> keys_just_pressed_this_tick;
+    for (const auto &key : input_state.all_keys) {
+        bool char_is_printable =
+            key.key_type == KeyType::ALPHA or key.key_type == KeyType::SYMBOL or key.key_type == KeyType::NUMERIC;
+        if (char_is_printable and key.pressed_signal.is_just_on()) {
+            std::string key_str = key.string_repr;
+            if (key.shiftable and input_state.key_enum_to_object.at(EKey::LEFT_SHIFT)->pressed_signal.is_on()) {
+                Key shifted_key = *input_state.key_enum_to_object.at(key.key_enum_of_shifted_version);
+                key_str = shifted_key.string_repr;
+            }
+            keys_just_pressed_this_tick.push_back(key_str);
+        }
+    }
+
+    // if keys just pressed this tick is has length greater or equal to 2, then that implies two keys were pressed ina
+    // single tick, should be rare enough to ignore, but note that it may be a cause for later bugs.
+    //
+
+    if (fs_browser_is_active) {
+
+        if (not keys_just_pressed_this_tick.empty()) {
+            for (const auto &key : keys_just_pressed_this_tick) {
+                fs_browser_search_query += key;
+            }
+
+            if (searchable_files.empty()) {
+                std::cout << "No files found in the search directory." << std::endl;
+            } else {
+                update_search_results(fs_browser_search_query, searchable_files, fb,
+                                      doids_for_textboxes_for_active_directory_for_later_removal, fs_browser,
+                                      search_results_changed_signal, selected_file_doid, currently_matched_files);
+            }
+        }
+
+        if (jp(EKey::ENTER)) {
+            if (currently_matched_files.size() != 0) {
+                std::cout << "about to load up: " << currently_matched_files[0] << std::endl;
+                std::string file_to_open = currently_matched_files[0];
+                LineTextBuffer ltb;
+                ltb.load_file(file_to_open);
+                viewport.buffer = ltb;
+                fs_browser_is_active = false;
+                return;
+            }
+        }
+
+        if (jp(EKey::CAPS_LOCK) or jp(EKey::ESCAPE)) {
+            std::cout << "tried to turn off fb" << std::endl;
+            fs_browser_is_active = false;
+            return;
+        }
+    }
+
+    // if you're running a command
+    if (move_and_edit_arcr.command_started) {
+        // then forget all other logic and only allow for text entry there
+        if (jp(EKey::ESCAPE)) {
+            command_bar_input = "";
+            command_bar_input_signal.toggle_state();
+            current_mode = MOVE_AND_EDIT;
+            mode_change_signal.toggle_state();
+        }
+        return;
+    }
+
+    if (fs_browser_is_active) {
+        return;
+    }
+
+    if (input_state.is_just_pressed(EKey::ESCAPE)) {
+        current_mode = MOVE_AND_EDIT;
+        mode_change_signal.toggle_state();
+    }
+
+    std::function<void()> shared_m_and_e_and_visual_selection_logic = [&]() {
+        if (jp(EKey::j)) {
+            viewport.scroll_down();
+        }
+        if (jp(EKey::k)) {
+            viewport.scroll_up();
+        }
+
+        if (jp(EKey::h)) {
+            viewport.scroll_left();
+        }
+
+        if (jp(EKey::l)) {
+            viewport.scroll_right();
+        }
+
+        if (jp(EKey::w)) {
+            viewport.move_cursor_forward_by_word();
+        }
+
+        if (jp(EKey::e)) {
+            viewport.move_cursor_forward_until_end_of_word();
+        }
+
+        if (ip(EKey::LEFT_SHIFT)) {
+            viewport.move_cursor_backward_until_start_of_word();
+        } else {
+            if (jp(EKey::b)) {
+                viewport.move_cursor_backward_by_word();
+            }
+        }
+    };
+
+    // we only run our commands if there is not an active command occuring in move and edit mode
+    if (not move_and_edit_arcr.command_started) {
+        // doing this only cause of the char callback not picking up space
+        // potentially just do tihs apprach and get rid of the char callback
+        /*if (input_state.is_just_pressed(EKey::SPACE)) {*/
+        /*    command_bar_input += " ";*/
+        /*    command_bar_input_signal.toggle_state();*/
+        /*}*/
+
+        if (current_mode == MOVE_AND_EDIT) {
+            shared_m_and_e_and_visual_selection_logic();
+            if (ip(EKey::LEFT_CONTROL)) {
+                if (jp(EKey::u)) {
+                    viewport.scroll(-5, 0);
+                }
+                if (jp(EKey::d)) {
+                    viewport.scroll(5, 0);
+                }
+            }
+            if (jp(EKey::o)) {
+                viewport.create_new_line_at_cursor_and_scroll_down();
+            }
+            if (jp(EKey::v)) {
+                current_mode = VISUAL_SELECT;
+                mode_change_signal.toggle_state();
+                line_where_selection_mode_started = viewport.active_buffer_line_under_cursor;
+                col_where_selection_mode_started = viewport.active_buffer_col_under_cursor;
+            }
+            if (jp(EKey::u)) {
+                if (current_mode == MOVE_AND_EDIT) {
+                    viewport.buffer.undo();
+                }
+            }
+            if (jp(EKey::r)) {
+                if (current_mode == MOVE_AND_EDIT) {
+                    viewport.buffer.redo();
+                }
+            }
+            if (jp(EKey::LEFT_SHIFT)) {
+                if (jp(EKey::n)) {
+                    // Check if there are any search results
+                    if (!search_results.empty()) {
+                        // Move to the previous search result, using forced positive modulo
+                        current_search_index =
+                            (current_search_index - 1 + search_results.size()) % search_results.size();
+                        SubTextIndex sti = search_results[current_search_index];
+                        viewport.set_active_buffer_line_col_under_cursor(sti.start_line, sti.start_col);
+                    } else {
+                        std::cout << "No search results found" << std::endl;
+                    }
+                }
+            } else {
+                if (jp(EKey::n)) {
+                    std::cout << "next one" << std::endl;
+
+                    if (!search_results.empty()) {
+                        current_search_index = (current_search_index + 1) % search_results.size();
+                        SubTextIndex sti = search_results[current_search_index];
+                        viewport.set_active_buffer_line_col_under_cursor(sti.start_line, sti.start_col);
+                    } else {
+                        std::cout << "No search results found" << std::endl;
+                    }
+                }
+            }
+            if (input_state.is_pressed(EKey::LEFT_SHIFT)) {
+                if (jp(EKey::SEMICOLON)) {
+                    current_mode = COMMAND;
+                    command_bar_input = ":";
+                    command_bar_input_signal.toggle_state();
+                    mode_change_signal.toggle_state();
+                }
+            }
+            if (jp(EKey::SLASH)) {
+                current_mode = COMMAND;
+                command_bar_input = "/";
+                command_bar_input_signal.toggle_state();
+                mode_change_signal.toggle_state();
+            }
+
+        } else if (current_mode == COMMAND) {
+            // only doing this cause space isn't handled by the char callback
+            if (jp(EKey::ENTER)) {
+                if (command_bar_input == ":w") {
+                    viewport.buffer.save_file();
+                }
+                if (command_bar_input == ":q") {
+                    glfwSetWindowShouldClose(window, true);
+                }
+                if (command_bar_input.front() == '/') {
+                    // Forward search command
+                    std::string search_request = command_bar_input.substr(1); // remove the "/"
+                    search_results =
+                        viewport.buffer.find_forward_matches(viewport.active_buffer_line_under_cursor,
+                                                             viewport.active_buffer_col_under_cursor, search_request);
+                    if (!search_results.empty()) {
+                        std::cout << "search active true now" << std::endl;
+                        current_search_index = 0; // start from the first result
+
+                        // Print out matches
+                        std::cout << "Search Results for '" << search_request << "':\n";
+                        for (const auto &result : search_results) {
+                            // Assuming SubTextIndex has `line` and `col` attributes for position
+                            std::cout << "Match at Line: " << result.start_line << ", Column: " << result.start_col
+                                      << "\n";
+                            // If you want to print the actual text matched:
+                            /*std::cout << "Matched text: " << matched_text << "\n";*/
+                        }
+                        // You may want to highlight the first search result here
+                        // highlight_search_result(search_results[current_search_index]);
+                    }
+                }
+
+                command_bar_input = "";
+                command_bar_input_signal.toggle_state();
+                current_mode = MOVE_AND_EDIT;
+                mode_change_signal.toggle_state();
+            }
+        }
+    }
+
+    if (current_mode == INSERT) {
+        if (jp(EKey::ENTER)) {
+            viewport.create_new_line_at_cursor_and_scroll_down();
+        }
+    } else if (current_mode == VISUAL_SELECT) {
+        shared_m_and_e_and_visual_selection_logic();
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -423,20 +802,57 @@ int main(int argc, char *argv[]) {
     file_sink->set_level(spdlog::level::info);
     std::vector<spdlog::sink_ptr> sinks = {console_sink, file_sink};
 
-    GLFWwindow *window =
-        initialize_glfw_glad_and_return_window(SCREEN_WIDTH, SCREEN_HEIGHT, "glfw window", true, false, false);
+    bool start_in_fullscreen = true;
+    GLFWwindow *window = initialize_glfw_glad_and_return_window(SCREEN_WIDTH, SCREEN_HEIGHT, "glfw window",
+                                                                start_in_fullscreen, false, false);
 
-    std::vector<ShaderType> requested_shaders = {ShaderType::ABSOLUTE_POSITION_TEXTURED,
-                                                 ShaderType::ABSOLUTE_POSITION_WITH_SOLID_COLOR};
+    std::vector<int> doids_for_textboxes_for_active_directory_for_later_removal;
+    TemporalBinarySignal search_results_changed_signal;
+
+    std::vector<ShaderType> requested_shaders = {
+        ShaderType::ABSOLUTE_POSITION_TEXTURED,
+        ShaderType::ABSOLUTE_POSITION_WITH_SOLID_COLOR,
+        ShaderType::TRANSFORM_V_WITH_SIGNED_DISTANCE_FIELD_TEXT,
+        ShaderType::ABSOLUTE_POSITION_WITH_COLORED_VERTEX,
+    };
 
     ShaderCache shader_cache(requested_shaders, sinks);
     Batcher batcher(shader_cache);
+
+    setup_sdf_shader_uniforms(shader_cache);
+
+    std::filesystem::path font_info_path =
+        std::filesystem::path("assets") / "fonts" / "times_64_sdf_atlas_font_info.json";
+    std::filesystem::path font_json_path = std::filesystem::path("assets") / "fonts" / "times_64_sdf_atlas.json";
+    std::filesystem::path font_image_path = std::filesystem::path("assets") / "fonts" / "times_64_sdf_atlas.png";
+    FontAtlas font_atlas(font_info_path.string(), font_json_path.string(), font_image_path.string(), SCREEN_WIDTH,
+                         false, true);
+
+    bool fs_browser_is_active = false;
+    std::string fs_browser_search_query = "";
+    std::string search_dir = ".";
+    std::vector<std::string> ignore_dirs = {"build", ".git", "__pycache__"};
+    std::vector<std::filesystem::path> searchable_files = rec_get_all_files(search_dir, ignore_dirs);
+    for (const auto &file : searchable_files) {
+        std::cout << file.string() << '\n';
+    }
+    UI fs_browser(font_atlas);
+    FileBrowser fb(1.5, 1.5);
+
+    std::string temp = "File Search";
+    std::string select = "select a file";
+    std::vector<std::string> currently_matched_files;
+    fs_browser.add_colored_rectangle(fb.background_rect, colors.gray10);
+    int curr_dir_doid = fs_browser.add_textbox(temp, fb.current_directory_rect, colors.gold);
+    fs_browser.add_colored_rectangle(fb.main_file_view_rect, colors.gray40);
+    int selected_file_doid = fs_browser.add_textbox(select, fb.file_selection_bar, colors.gray40);
 
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     InputState input_state;
+    std::cout << "after constructor" << std::endl;
 
     std::unordered_map<EditorMode, glm::vec4> mode_to_cursor_color = {
         {MOVE_AND_EDIT, {.5, .5, .5, .5}},
@@ -502,7 +918,10 @@ int main(int argc, char *argv[]) {
 
     std::string filename = argv[1]; // Get the file name from the first argument
 
+    std::vector<LineTextBuffer> active_file_buffers;
     LineTextBuffer file_buffer;
+    active_file_buffers.push_back(file_buffer);
+
     LineTextBuffer file_info;
     LineTextBuffer command_line;
     if (!file_buffer.load_file(filename)) {
@@ -516,28 +935,31 @@ int main(int argc, char *argv[]) {
     TemporalBinarySignal insert_mode_signal;
 
     std::function<void(unsigned int)> char_callback = [&](unsigned int character_code) {
-        if (current_mode == INSERT) {
+        if (fs_browser_is_active) {
+        } else {
+            if (current_mode == INSERT) {
 
-            // update the thing or else it gets stuck
-            if (insert_mode_signal.next_has_just_changed()) {
-                return;
+                // update the thing or else it gets stuck
+                if (insert_mode_signal.next_has_just_changed()) {
+                    return;
+                }
+
+                // Convert the character code to a character
+                char character = static_cast<char>(character_code);
+
+                // Insert the character at the current cursor position
+                if (!viewport.insert_character_at_cursor(character)) {
+                    // Handle the case where the insertion failed
+                    std::cerr << "Failed to insert character at cursor position.\n";
+                }
             }
 
-            // Convert the character code to a character
-            char character = static_cast<char>(character_code);
-
-            // Insert the character at the current cursor position
-            if (!viewport.insert_character_at_cursor(character)) {
-                // Handle the case where the insertion failed
-                std::cerr << "Failed to insert character at cursor position.\n";
+            if (current_mode == COMMAND) {
+                // Convert the character code to a character
+                char character = static_cast<char>(character_code);
+                command_bar_input += character;
+                command_bar_input_signal.toggle_state();
             }
-        }
-
-        if (current_mode == COMMAND) {
-            // Convert the character code to a character
-            char character = static_cast<char>(character_code);
-            command_bar_input += character;
-            command_bar_input_signal.toggle_state();
         }
     };
 
@@ -546,26 +968,34 @@ int main(int argc, char *argv[]) {
         // these events happen once when the key is pressed down, aka its non-repeating; a one time event
 
         if (action == GLFW_PRESS || action == GLFW_RELEASE) {
-            Key active_key = input_state.glfw_code_to_key.at(key);
+
+            Key &active_key = *input_state.glfw_code_to_key.at(key);
             bool is_pressed = (action == GLFW_PRESS);
-            input_state.key_to_state.at(active_key).set_signal(is_pressed);
+            active_key.pressed_signal.set_signal(is_pressed);
+
+            Key &enum_grabbed_key = *input_state.key_enum_to_object.at(active_key.key_enum);
 
             if (current_mode == MOVE_AND_EDIT) {
                 if (action == GLFW_PRESS) {
-                    auto key_type = get_key_type(active_key);
-                    if (key_type == KeyType::ALPHA or key_type == KeyType::NUMERIC) {
+                    if (active_key.key_type == KeyType::ALPHA or active_key.key_type == KeyType::NUMERIC) {
+
                         if (mods & GLFW_MOD_SHIFT) {
-                            active_key = get_shifted_key(active_key);
+                            if (active_key.shiftable) {
+                                active_key = *input_state.key_enum_to_object.at(active_key.key_enum_of_shifted_version);
+                            }
                         }
-                        std::string key_str = input_state.key_to_key_string.at(active_key);
+                        std::string key_str = active_key.string_repr;
                         // maybe this can be generalized to unary, binary etc type commands
-                        std::vector<std::string> potential_automatic_command_prefixes = {"d", "c", "y", "f",
-                                                                                         "F", "t", "T"};
+                        std::vector<std::string> potential_automatic_command_prefixes = {"d", "c", "y", "f", "F", "t",
+                                                                                         "T",
+                                                                                         // temp adding theses
+                                                                                         "r", "e", "w"};
 
                         bool command_started_or_continuing =
                             starts_with_any_prefix(key_str, potential_automatic_command_prefixes) or
                             move_and_edit_arcr.command_started;
-                        bool control_not_pressed = input_state.key_to_state.at(Key::LEFT_CONTROL).is_off();
+                        bool control_not_pressed =
+                            input_state.key_enum_to_object.at(EKey::LEFT_CONTROL)->pressed_signal.is_off();
                         if (command_started_or_continuing and control_not_pressed) {
                             potential_automatic_command += key_str;
                             if (potential_automatic_command.length() > 3) {
@@ -574,12 +1004,13 @@ int main(int argc, char *argv[]) {
                             std::cout << potential_automatic_command << std::endl;
                         }
                         bool command_was_run = move_and_edit_arcr.potentially_run_normal_mode_command(
-                            potential_automatic_command, viewport, current_mode, mode_change_signal, window);
+                            potential_automatic_command, viewport, current_mode, mode_change_signal, window,
+                            fs_browser_is_active);
                         if (command_was_run) {
                             potential_automatic_command = "";
                         }
                     }
-                    if (active_key == Key::ESCAPE or active_key == Key::CAPS_LOCK) {
+                    if (active_key.key_enum == EKey::ESCAPE or active_key.key_enum == EKey::CAPS_LOCK) {
                         potential_automatic_command = "";
                     }
                 }
@@ -619,8 +1050,20 @@ int main(int argc, char *argv[]) {
                 }
                 break;
             case GLFW_KEY_BACKSPACE:
-                if (current_mode == INSERT) {
-                    viewport.backspace_at_active_position();
+                if (fs_browser_is_active) {
+                    std::cout << "search backspace" << std::endl;
+                    fs_browser_search_query =
+                        fs_browser_search_query.empty()
+                            ? ""
+                            : fs_browser_search_query.substr(0, fs_browser_search_query.size() - 1);
+                    update_search_results(fs_browser_search_query, searchable_files, fb,
+                                          doids_for_textboxes_for_active_directory_for_later_removal, fs_browser,
+                                          search_results_changed_signal, selected_file_doid, currently_matched_files);
+                } else {
+                    std::cout << "non seach backspace" << std::endl;
+                    if (current_mode == INSERT) {
+                        viewport.backspace_at_active_position();
+                    }
                 }
                 break;
             case GLFW_KEY_4:                 // $ key (Shift + 4)
@@ -688,173 +1131,54 @@ int main(int argc, char *argv[]) {
                col_where_selection_mode_started, line_where_selection_mode_started, current_mode, shader_cache,
                mode_to_cursor_color);
 
+        // render UI stuff
+
+        if (fs_browser_is_active) {
+
+            for (auto &cb : fs_browser.get_colored_boxes()) {
+                batcher.absolute_position_with_colored_vertex_shader_batcher.queue_draw(
+                    cb.id, cb.ivpsc.indices, cb.ivpsc.xyz_positions, cb.ivpsc.rgb_colors);
+            }
+
+            for (auto &tb : fs_browser.get_text_boxes()) {
+                bool should_change = search_results_changed_signal.has_just_changed();
+                batcher.absolute_position_with_colored_vertex_shader_batcher.queue_draw(
+                    tb.id, tb.background_ivpsc.indices, tb.background_ivpsc.xyz_positions,
+                    tb.background_ivpsc.rgb_colors);
+
+                batcher.transform_v_with_signed_distance_field_text_shader_batcher.queue_draw(
+                    tb.id, tb.text_drawing_data.indices, tb.text_drawing_data.xyz_positions,
+                    tb.text_drawing_data.texture_coordinates, tb.modified_signal.has_just_changed());
+            }
+
+            for (auto &tb : fs_browser.get_clickable_text_boxes()) {
+                batcher.absolute_position_with_colored_vertex_shader_batcher.queue_draw(
+                    tb.id, tb.ivpsc.indices, tb.ivpsc.xyz_positions, tb.ivpsc.rgb_colors,
+                    tb.modified_signal.has_just_changed());
+
+                batcher.transform_v_with_signed_distance_field_text_shader_batcher.queue_draw(
+                    tb.id, tb.text_drawing_data.indices, tb.text_drawing_data.xyz_positions,
+                    tb.text_drawing_data.texture_coordinates);
+            }
+
+            /*glDisable(GL_DEPTH_TEST);*/
+            font_atlas.texture_atlas.bind_texture();
+            batcher.absolute_position_with_colored_vertex_shader_batcher.draw_everything();
+            batcher.transform_v_with_signed_distance_field_text_shader_batcher.draw_everything();
+            /*glEnable(GL_DEPTH_TEST);*/
+        }
+
+        // render UI stuff
+
         // not sure why this has to go here right now but it doesn't update if it comes after mofifying viewport.
-
         viewport.tick();
-        if (input_state.key_to_state.at(Key::ESCAPE).is_just_on()) {
-            current_mode = MOVE_AND_EDIT;
-            mode_change_signal.toggle_state();
-        }
 
-        std::function<void()> shared_m_and_e_and_visual_selection_logic = [&]() {
-            if (input_state.key_to_state.at(Key::J).is_just_on()) {
-                viewport.scroll_down();
-            }
-
-            if (input_state.key_to_state.at(Key::K).is_just_on()) {
-                viewport.scroll_up();
-            }
-
-            if (input_state.key_to_state.at(Key::H).is_just_on()) {
-                viewport.scroll_left();
-            }
-
-            if (input_state.key_to_state.at(Key::L).is_just_on()) {
-                viewport.scroll_right();
-            }
-
-            if (input_state.key_to_state.at(Key::W).is_just_on()) {
-                viewport.move_cursor_forward_by_word();
-            }
-
-            if (input_state.key_to_state.at(Key::E).is_just_on()) {
-                viewport.move_cursor_forward_until_end_of_word();
-            }
-
-            if (input_state.key_to_state.at(Key::LEFT_SHIFT).is_just_on()) {
-                viewport.move_cursor_backward_until_start_of_word();
-            } else {
-                if (input_state.key_to_state.at(Key::B).is_just_on()) {
-                    viewport.move_cursor_backward_by_word();
-                }
-            }
-        };
-
-        // we only run our commands if there is not an active command occuring in move and edit mode
-        if (not move_and_edit_arcr.command_started) {
-            if (current_mode == MOVE_AND_EDIT) {
-                shared_m_and_e_and_visual_selection_logic();
-                if (input_state.key_to_state.at(Key::LEFT_CONTROL).is_on()) {
-                    if (input_state.key_to_state.at(Key::U).is_just_on()) {
-                        viewport.scroll(-5, 0);
-                    }
-                    if (input_state.key_to_state.at(Key::D).is_just_on()) {
-                        viewport.scroll(5, 0);
-                    }
-                }
-                if (input_state.key_to_state.at(Key::O).is_just_on()) {
-                    viewport.create_new_line_at_cursor_and_scroll_down();
-                }
-                if (input_state.key_to_state.at(Key::V).is_just_on()) {
-                    current_mode = VISUAL_SELECT;
-                    mode_change_signal.toggle_state();
-                    line_where_selection_mode_started = viewport.active_buffer_line_under_cursor;
-                    col_where_selection_mode_started = viewport.active_buffer_col_under_cursor;
-                }
-                if (input_state.key_to_state.at(Key::U).is_just_on()) {
-                    if (current_mode == MOVE_AND_EDIT) {
-                        viewport.buffer.undo();
-                    }
-                }
-                if (input_state.key_to_state.at(Key::R).is_just_on()) {
-                    if (current_mode == MOVE_AND_EDIT) {
-                        viewport.buffer.redo();
-                    }
-                }
-                if (input_state.key_to_state.at(Key::LEFT_SHIFT).is_on()) {
-                    if (input_state.key_to_state.at(Key::N).is_just_on()) {
-                        // Check if there are any search results
-                        if (!search_results.empty()) {
-                            // Move to the previous search result, using forced positive modulo
-                            current_search_index =
-                                (current_search_index - 1 + search_results.size()) % search_results.size();
-                            SubTextIndex sti = search_results[current_search_index];
-                            viewport.set_active_buffer_line_col_under_cursor(sti.start_line, sti.start_col);
-                        } else {
-                            std::cout << "No search results found" << std::endl;
-                        }
-                    }
-                } else {
-                    if (input_state.key_to_state.at(Key::N).is_just_on()) {
-                        std::cout << "next one" << std::endl;
-
-                        if (!search_results.empty()) {
-                            current_search_index = (current_search_index + 1) % search_results.size();
-                            SubTextIndex sti = search_results[current_search_index];
-                            viewport.set_active_buffer_line_col_under_cursor(sti.start_line, sti.start_col);
-                        } else {
-                            std::cout << "No search results found" << std::endl;
-                        }
-                    }
-                }
-                if (input_state.key_to_state.at(Key::LEFT_SHIFT).is_on()) {
-                    if (input_state.key_to_state.at(Key::SEMICOLON).is_just_on()) {
-                        current_mode = COMMAND;
-                        command_bar_input = ":";
-                        command_bar_input_signal.toggle_state();
-                        mode_change_signal.toggle_state();
-                    }
-                }
-                if (input_state.key_to_state.at(Key::SLASH).is_just_on()) {
-                    current_mode = COMMAND;
-                    command_bar_input = "/";
-                    command_bar_input_signal.toggle_state();
-                    mode_change_signal.toggle_state();
-                }
-
-            } else if (current_mode == COMMAND) {
-                if (input_state.key_to_state.at(Key::ESCAPE).is_just_on()) {
-                    command_bar_input = "";
-                    command_bar_input_signal.toggle_state();
-                    current_mode = MOVE_AND_EDIT;
-                    mode_change_signal.toggle_state();
-                }
-                if (input_state.key_to_state.at(Key::ENTER).is_just_on()) {
-                    if (command_bar_input == ":w") {
-                        viewport.buffer.save_file();
-                    }
-                    if (command_bar_input == ":q") {
-                        glfwSetWindowShouldClose(window, true);
-                    }
-                    if (command_bar_input.front() == '/') {
-                        // Forward search command
-                        std::string search_request = command_bar_input.substr(1); // remove the "/"
-                        search_results = viewport.buffer.find_forward_matches(viewport.active_buffer_line_under_cursor,
-                                                                              viewport.active_buffer_col_under_cursor,
-                                                                              search_request);
-                        if (!search_results.empty()) {
-                            is_search_active = true;
-                            current_search_index = 0; // start from the first result
-
-                            // Print out matches
-                            std::cout << "Search Results for '" << search_request << "':\n";
-                            for (const auto &result : search_results) {
-                                // Assuming SubTextIndex has `line` and `col` attributes for position
-                                std::cout << "Match at Line: " << result.start_line << ", Column: " << result.start_col
-                                          << "\n";
-                                // If you want to print the actual text matched:
-                                /*std::cout << "Matched text: " << matched_text << "\n";*/
-                            }
-                            // You may want to highlight the first search result here
-                            // highlight_search_result(search_results[current_search_index]);
-                        }
-                    }
-
-                    command_bar_input = "";
-                    command_bar_input_signal.toggle_state();
-                    current_mode = MOVE_AND_EDIT;
-                    mode_change_signal.toggle_state();
-                }
-            }
-        }
-
-        if (current_mode == INSERT) {
-            if (input_state.key_to_state.at(Key::ENTER).is_just_on()) {
-                viewport.create_new_line_at_cursor_and_scroll_down();
-            }
-        } else if (current_mode == VISUAL_SELECT) {
-            shared_m_and_e_and_visual_selection_logic();
-        }
+        run_key_logic(input_state, current_mode, mode_change_signal, viewport, move_and_edit_arcr,
+                      line_where_selection_mode_started, col_where_selection_mode_started, search_results,
+                      current_search_index, command_bar_input, command_bar_input_signal, window, is_search_active,
+                      fs_browser_is_active, fs_browser_search_query, searchable_files, fb,
+                      doids_for_textboxes_for_active_directory_for_later_removal, fs_browser,
+                      search_results_changed_signal, selected_file_doid, currently_matched_files);
 
         TemporalBinarySignal::process_all();
         glfwSwapBuffers(window);

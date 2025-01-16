@@ -1,0 +1,820 @@
+/home/ccn/projects/cpp-toolbox-organization/editor/build/Release
+[2025-01-15 20:56:38.592] [shader cache] [info] creating new shader program
+[2025-01-15 20:56:38.599] [shader cache] [info] Successfully linked shader program
+[2025-01-15 20:56:38.599] [shader cache] [info] creating new shader program
+[2025-01-15 20:56:38.599] [shader cache] [info] Successfully linked shader program
+[2025-01-15 20:56:38.599] [shader cache] [info] creating new shader program
+[2025-01-15 20:56:38.599] [shader cache] [info] Successfully linked shader program
+[2025-01-15 20:56:38.599] [shader cache] [info] creating new shader program
+[2025-01-15 20:56:38.599] [shader cache] [info] Successfully linked shader program
+[2025-01-15 20:56:38.599] [shader cache] [info] Logging Created Shaders:
+[2025-01-15 20:56:38.599] [shader cache] [info] Total shaders: 4
+[2025-01-15 20:56:38.599] [shader cache] [info] Shader Type: absolute_position_with_colored_vertex, Program ID: 10
+[2025-01-15 20:56:38.599] [shader cache] [info] Shader Type: transform_v_with_signed_distance_field_text, Program ID: 7
+[2025-01-15 20:56:38.599] [shader cache] [info] Shader Type: absolute_position_with_solid_color, Program ID: 4
+[2025-01-15 20:56:38.599] [shader cache] [info] Shader Type: absolute_position_textured, Program ID: 1
+[2025-01-15 20:56:38.599] [shader cache] [info] Binding vertex attribute xyz_position
+[2025-01-15 20:56:38.599] [shader cache] [info] Binding vertex attribute xyz_position
+[2025-01-15 20:56:38.599] [shader cache] [info] Binding vertex attribute passthrough_rgb_color
+[2025-01-15 20:56:38.599] [shader cache] [info] Binding vertex attribute xyz_position
+[2025-01-15 20:56:38.599] [shader cache] [info] Binding vertex attribute passthrough_texture_coordinate
+[2025-01-15 20:56:38.599] [shader cache] [info] Binding vertex attribute xyz_position
+[2025-01-15 20:56:38.599] [shader cache] [info] Binding vertex attribute passthrough_texture_coordinate
+Texture loaded from: assets/fonts/times_64_sdf_atlas.png
+x: 0.800781, y: 0.726562
+x: 0.800781, y: 0.773438
+x: 0.789062, y: 0.773438
+x: 0.789062, y: 0.726562
+x: 0.271484, y: 0.296875
+x: 0.271484, y: 0.515625
+x: 0.25293, y: 0.515625
+x: 0.25293, y: 0.296875
+x: 0.595703, y: 0.726562
+x: 0.595703, y: 0.835938
+x: 0.567383, y: 0.835938
+x: 0.567383, y: 0.726562
+x: 0.700195, y: 0.515625
+x: 0.700195, y: 0.726562
+x: 0.657227, y: 0.726562
+x: 0.657227, y: 0.515625
+x: 0.24707, y: 0
+x: 0.24707, y: 0.253906
+x: 0.208984, y: 0.253906
+x: 0.208984, y: 0
+x: 0.469727, y: 0
+x: 0.469727, y: 0.21875
+x: 0.413086, y: 0.21875
+x: 0.413086, y: 0
+x: 0.525391, y: 0
+x: 0.525391, y: 0.21875
+x: 0.469727, y: 0.21875
+x: 0.469727, y: 0
+x: 0.632812, y: 0.726562
+x: 0.632812, y: 0.835938
+x: 0.616211, y: 0.835938
+x: 0.616211, y: 0.726562
+x: 0.154297, y: 0
+x: 0.154297, y: 0.261719
+x: 0.126953, y: 0.261719
+x: 0.126953, y: 0
+x: 0.126953, y: 0
+x: 0.126953, y: 0.261719
+x: 0.0986328, y: 0.261719
+x: 0.0986328, y: 0
+x: 0.485352, y: 0.726562
+x: 0.485352, y: 0.875
+x: 0.450195, y: 0.875
+x: 0.450195, y: 0.726562
+x: 0.899414, y: 0.515625
+x: 0.899414, y: 0.6875
+x: 0.855469, y: 0.6875
+x: 0.855469, y: 0.515625
+x: 0.616211, y: 0.726562
+x: 0.616211, y: 0.835938
+x: 0.595703, y: 0.835938
+x: 0.595703, y: 0.726562
+x: 0.746094, y: 0.726562
+x: 0.746094, y: 0.789062
+x: 0.71875, y: 0.789062
+x: 0.71875, y: 0.726562
+x: 0.71875, y: 0.726562
+x: 0.71875, y: 0.800781
+x: 0.699219, y: 0.800781
+x: 0.699219, y: 0.726562
+x: 0.169922, y: 0.296875
+x: 0.169922, y: 0.515625
+x: 0.139648, y: 0.515625
+x: 0.139648, y: 0.296875
+x: 0.944336, y: 0
+x: 0.944336, y: 0.21875
+x: 0.904297, y: 0.21875
+x: 0.904297, y: 0
+x: 0.910156, y: 0.296875
+x: 0.910156, y: 0.511719
+x: 0.880859, y: 0.511719
+x: 0.880859, y: 0.296875
+x: 0.767578, y: 0.296875
+x: 0.767578, y: 0.511719
+x: 0.727539, y: 0.511719
+x: 0.727539, y: 0.296875
+x: 0.0361328, y: 0.296875
+x: 0.0361328, y: 0.515625
+x: 0, y: 0.515625
+x: 0, y: 0.296875
+x: 0.604492, y: 0.296875
+x: 0.604492, y: 0.511719
+x: 0.563477, y: 0.511719
+x: 0.563477, y: 0.296875
+x: 0.413086, y: 0
+x: 0.413086, y: 0.222656
+x: 0.375977, y: 0.222656
+x: 0.375977, y: 0
+x: 0.336914, y: 0
+x: 0.336914, y: 0.222656
+x: 0.297852, y: 0.222656
+x: 0.297852, y: 0
+x: 0.84668, y: 0.296875
+x: 0.84668, y: 0.511719
+x: 0.807617, y: 0.511719
+x: 0.807617, y: 0.296875
+x: 0.0722656, y: 0.296875
+x: 0.0722656, y: 0.515625
+x: 0.0361328, y: 0.515625
+x: 0.0361328, y: 0.296875
+x: 0.375977, y: 0
+x: 0.375977, y: 0.222656
+x: 0.336914, y: 0.222656
+x: 0.336914, y: 0
+x: 0.199219, y: 0.726562
+x: 0.199219, y: 0.890625
+x: 0.180664, y: 0.890625
+x: 0.180664, y: 0.726562
+x: 0.779297, y: 0.515625
+x: 0.779297, y: 0.710938
+x: 0.758789, y: 0.710938
+x: 0.758789, y: 0.515625
+x: 0.817383, y: 0.515625
+x: 0.817383, y: 0.699219
+x: 0.779297, y: 0.699219
+x: 0.779297, y: 0.515625
+x: 0.567383, y: 0.726562
+x: 0.567383, y: 0.839844
+x: 0.523438, y: 0.839844
+x: 0.523438, y: 0.726562
+x: 0.855469, y: 0.515625
+x: 0.855469, y: 0.699219
+x: 0.817383, y: 0.699219
+x: 0.817383, y: 0.515625
+x: 0.139648, y: 0.296875
+x: 0.139648, y: 0.515625
+x: 0.106445, y: 0.515625
+x: 0.106445, y: 0.296875
+x: 0.581055, y: 0
+x: 0.581055, y: 0.21875
+x: 0.525391, y: 0.21875
+x: 0.525391, y: 0
+x: 0.397461, y: 0.296875
+x: 0.397461, y: 0.511719
+x: 0.341797, y: 0.511719
+x: 0.341797, y: 0.296875
+x: 0.519531, y: 0.515625
+x: 0.519531, y: 0.726562
+x: 0.47168, y: 0.726562
+x: 0.47168, y: 0.515625
+x: 0.737305, y: 0
+x: 0.737305, y: 0.21875
+x: 0.6875, y: 0.21875
+x: 0.6875, y: 0
+x: 0.273438, y: 0.515625
+x: 0.273438, y: 0.726562
+x: 0.219727, y: 0.726562
+x: 0.219727, y: 0.515625
+x: 0.374023, y: 0.515625
+x: 0.374023, y: 0.726562
+x: 0.325195, y: 0.726562
+x: 0.325195, y: 0.515625
+x: 0.612305, y: 0.515625
+x: 0.612305, y: 0.726562
+x: 0.567383, y: 0.726562
+x: 0.567383, y: 0.515625
+x: 0.634766, y: 0
+x: 0.634766, y: 0.21875
+x: 0.581055, y: 0.21875
+x: 0.581055, y: 0
+x: 0.110352, y: 0.515625
+x: 0.110352, y: 0.726562
+x: 0.0556641, y: 0.726562
+x: 0.0556641, y: 0.515625
+x: 0.730469, y: 0.515625
+x: 0.730469, y: 0.726562
+x: 0.700195, y: 0.726562
+x: 0.700195, y: 0.515625
+x: 0.880859, y: 0.296875
+x: 0.880859, y: 0.511719
+x: 0.84668, y: 0.511719
+x: 0.84668, y: 0.296875
+x: 0.165039, y: 0.515625
+x: 0.165039, y: 0.726562
+x: 0.110352, y: 0.726562
+x: 0.110352, y: 0.515625
+x: 0.422852, y: 0.515625
+x: 0.422852, y: 0.726562
+x: 0.374023, y: 0.726562
+x: 0.374023, y: 0.515625
+x: 0.975586, y: 0.296875
+x: 0.975586, y: 0.507812
+x: 0.910156, y: 0.507812
+x: 0.910156, y: 0.296875
+x: 0.453125, y: 0.296875
+x: 0.453125, y: 0.511719
+x: 0.397461, y: 0.511719
+x: 0.397461, y: 0.296875
+x: 0.6875, y: 0
+x: 0.6875, y: 0.21875
+x: 0.634766, y: 0.21875
+x: 0.634766, y: 0
+x: 0.657227, y: 0.515625
+x: 0.657227, y: 0.726562
+x: 0.612305, y: 0.726562
+x: 0.612305, y: 0.515625
+x: 0.0986328, y: 0
+x: 0.0986328, y: 0.261719
+x: 0.0449219, y: 0.261719
+x: 0.0449219, y: 0
+x: 0.325195, y: 0.515625
+x: 0.325195, y: 0.726562
+x: 0.273438, y: 0.726562
+x: 0.273438, y: 0.515625
+x: 0.984375, y: 0
+x: 0.984375, y: 0.21875
+x: 0.944336, y: 0.21875
+x: 0.944336, y: 0
+x: 0.567383, y: 0.515625
+x: 0.567383, y: 0.726562
+x: 0.519531, y: 0.726562
+x: 0.519531, y: 0.515625
+x: 0.508789, y: 0.296875
+x: 0.508789, y: 0.511719
+x: 0.453125, y: 0.511719
+x: 0.453125, y: 0.296875
+x: 0.563477, y: 0.296875
+x: 0.563477, y: 0.511719
+x: 0.508789, y: 0.511719
+x: 0.508789, y: 0.296875
+x: 0.341797, y: 0.296875
+x: 0.341797, y: 0.511719
+x: 0.271484, y: 0.511719
+x: 0.271484, y: 0.296875
+x: 0.0556641, y: 0.515625
+x: 0.0556641, y: 0.726562
+x: 0, y: 0.726562
+x: 0, y: 0.515625
+x: 0.219727, y: 0.515625
+x: 0.219727, y: 0.726562
+x: 0.165039, y: 0.726562
+x: 0.165039, y: 0.515625
+x: 0.47168, y: 0.515625
+x: 0.47168, y: 0.726562
+x: 0.422852, y: 0.726562
+x: 0.422852, y: 0.515625
+x: 0.272461, y: 0
+x: 0.272461, y: 0.25
+x: 0.24707, y: 0.25
+x: 0.24707, y: 0
+x: 0.200195, y: 0.296875
+x: 0.200195, y: 0.515625
+x: 0.169922, y: 0.515625
+x: 0.169922, y: 0.296875
+x: 0.297852, y: 0
+x: 0.297852, y: 0.25
+x: 0.272461, y: 0.25
+x: 0.272461, y: 0
+x: 0.523438, y: 0.726562
+x: 0.523438, y: 0.867188
+x: 0.485352, y: 0.867188
+x: 0.485352, y: 0.726562
+x: 0.789062, y: 0.726562
+x: 0.789062, y: 0.785156
+x: 0.746094, y: 0.785156
+x: 0.746094, y: 0.726562
+x: 0.658203, y: 0.726562
+x: 0.658203, y: 0.816406
+x: 0.632812, y: 0.816406
+x: 0.632812, y: 0.726562
+x: 0.0771484, y: 0.726562
+x: 0.0771484, y: 0.890625
+x: 0.0400391, y: 0.890625
+x: 0.0400391, y: 0.726562
+x: 0.863281, y: 0
+x: 0.863281, y: 0.21875
+x: 0.822266, y: 0.21875
+x: 0.822266, y: 0
+x: 0.150391, y: 0.726562
+x: 0.150391, y: 0.890625
+x: 0.114258, y: 0.890625
+x: 0.114258, y: 0.726562
+x: 0.904297, y: 0
+x: 0.904297, y: 0.21875
+x: 0.863281, y: 0.21875
+x: 0.863281, y: 0
+x: 0.114258, y: 0.726562
+x: 0.114258, y: 0.890625
+x: 0.0771484, y: 0.890625
+x: 0.0771484, y: 0.726562
+x: 0.106445, y: 0.296875
+x: 0.106445, y: 0.515625
+x: 0.0722656, y: 0.515625
+x: 0.0722656, y: 0.296875
+x: 0.807617, y: 0.296875
+x: 0.807617, y: 0.511719
+x: 0.767578, y: 0.511719
+x: 0.767578, y: 0.296875
+x: 0.822266, y: 0
+x: 0.822266, y: 0.21875
+x: 0.780273, y: 0.21875
+x: 0.780273, y: 0
+x: 0.226562, y: 0.296875
+x: 0.226562, y: 0.515625
+x: 0.200195, y: 0.515625
+x: 0.200195, y: 0.296875
+x: 0.0449219, y: 0
+x: 0.0449219, y: 0.273438
+x: 0.0166016, y: 0.273438
+x: 0.0166016, y: 0
+x: 0.780273, y: 0
+x: 0.780273, y: 0.21875
+x: 0.737305, y: 0.21875
+x: 0.737305, y: 0
+x: 0.25293, y: 0.296875
+x: 0.25293, y: 0.515625
+x: 0.226562, y: 0.515625
+x: 0.226562, y: 0.296875
+x: 0.258789, y: 0.726562
+x: 0.258789, y: 0.886719
+x: 0.199219, y: 0.886719
+x: 0.199219, y: 0.726562
+x: 0.299805, y: 0.726562
+x: 0.299805, y: 0.886719
+x: 0.258789, y: 0.886719
+x: 0.258789, y: 0.726562
+x: 0.0400391, y: 0.726562
+x: 0.0400391, y: 0.890625
+x: 0, y: 0.890625
+x: 0, y: 0.726562
+x: 0.645508, y: 0.296875
+x: 0.645508, y: 0.511719
+x: 0.604492, y: 0.511719
+x: 0.604492, y: 0.296875
+x: 0.686523, y: 0.296875
+x: 0.686523, y: 0.511719
+x: 0.645508, y: 0.511719
+x: 0.645508, y: 0.296875
+x: 0.450195, y: 0.726562
+x: 0.450195, y: 0.886719
+x: 0.417969, y: 0.886719
+x: 0.417969, y: 0.726562
+x: 0.180664, y: 0.726562
+x: 0.180664, y: 0.890625
+x: 0.150391, y: 0.890625
+x: 0.150391, y: 0.726562
+x: 0.758789, y: 0.515625
+x: 0.758789, y: 0.710938
+x: 0.730469, y: 0.710938
+x: 0.730469, y: 0.515625
+x: 0.34082, y: 0.726562
+x: 0.34082, y: 0.886719
+x: 0.299805, y: 0.886719
+x: 0.299805, y: 0.726562
+x: 0.994141, y: 0.515625
+x: 0.994141, y: 0.679688
+x: 0.953125, y: 0.679688
+x: 0.953125, y: 0.515625
+x: 0.953125, y: 0.515625
+x: 0.953125, y: 0.679688
+x: 0.899414, y: 0.679688
+x: 0.899414, y: 0.515625
+x: 0.381836, y: 0.726562
+x: 0.381836, y: 0.886719
+x: 0.34082, y: 0.886719
+x: 0.34082, y: 0.726562
+x: 0.727539, y: 0.296875
+x: 0.727539, y: 0.511719
+x: 0.686523, y: 0.511719
+x: 0.686523, y: 0.296875
+x: 0.417969, y: 0.726562
+x: 0.417969, y: 0.886719
+x: 0.381836, y: 0.886719
+x: 0.381836, y: 0.726562
+x: 0.181641, y: 0
+x: 0.181641, y: 0.261719
+x: 0.154297, y: 0.261719
+x: 0.154297, y: 0
+x: 0.0166016, y: 0
+x: 0.0166016, y: 0.296875
+x: 0, y: 0.296875
+x: 0, y: 0
+x: 0.208984, y: 0
+x: 0.208984, y: 0.261719
+x: 0.181641, y: 0.261719
+x: 0.181641, y: 0
+x: 0.699219, y: 0.726562
+x: 0.699219, y: 0.808594
+x: 0.658203, y: 0.808594
+x: 0.658203, y: 0.726562
+Looking at: src
+Looking at: graphics
+Looking at: font_atlas
+Looking at: colors
+Looking at: shader_cache
+Looking at: shader_standard
+Looking at: __pycache__
+Skipping: __pycache__ and its subdirectories
+Looking at: window
+Looking at: ui
+Looking at: batcher
+Looking at: generated
+Looking at: __pycache__
+Skipping: __pycache__ and its subdirectories
+Looking at: cpp_utils
+Looking at: __pycache__
+Skipping: __pycache__ and its subdirectories
+Looking at: draw_info
+Looking at: transform
+Looking at: vertex_geometry
+Looking at: texture_atlas
+Looking at: viewport
+Looking at: utility
+Looking at: input_state
+Looking at: glfw_lambda_callback_manager
+Looking at: limited_vector
+Looking at: temporal_binary_signal
+Looking at: logger_component
+Looking at: expiring_temporal_vector
+Looking at: unique_id_generator
+Looking at: text_buffer
+Looking at: fs_utils
+Looking at: .git
+Skipping: .git and its subdirectories
+Looking at: scripts
+Looking at: clang_formatting
+Looking at: cpp_tbx_submodule_adder
+Looking at: ccgen
+Looking at: cpp_project_bootstrapper
+Looking at: text_utils
+Looking at: user_input
+Looking at: __pycache__
+Skipping: __pycache__ and its subdirectories
+Looking at: fs_utils
+Looking at: __pycache__
+Skipping: __pycache__ and its subdirectories
+Looking at: sbpt
+Looking at: print_utils
+Looking at: __pycache__
+Skipping: __pycache__ and its subdirectories
+Looking at: setup
+Looking at: fs_utils
+Looking at: __pycache__
+Skipping: __pycache__ and its subdirectories
+Looking at: process_changes_in_submodules
+Looking at: build_notifier
+Looking at: sounds
+Looking at: gource_for_submodules
+Looking at: editor_configurations
+Looking at: cpp_file_generator
+Looking at: textures
+Looking at: json_spritesheet_generator
+Looking at: texture_packer
+Looking at: atlas_visualizer
+Looking at: assets
+Looking at: shaders
+Looking at: src
+Looking at: texture_packer
+Looking at: out
+Looking at: texture_packer
+Looking at: fonts
+Looking at: font
+Looking at: build
+Skipping: build and its subdirectories
+./.clangd
+./.gitmodules
+./test.txt
+./output.txt
+./src/graphics/font_atlas/.gitignore
+./src/graphics/font_atlas/.git
+./src/graphics/font_atlas/sbpt_generated_includes.hpp
+./src/graphics/font_atlas/font_atlas.hpp
+./src/graphics/font_atlas/font_atlas.cpp
+./src/graphics/font_atlas/README.md
+./src/graphics/font_atlas/sbpt.ini
+./src/graphics/colors/.git
+./src/graphics/colors/colors.hpp
+./src/graphics/colors/README.md
+./src/graphics/colors/sbpt.ini
+./src/graphics/colors/colors.cpp
+./src/graphics/shader_cache/shader_cache.cpp
+./src/graphics/shader_cache/.gitignore
+./src/graphics/shader_cache/.git
+./src/graphics/shader_cache/sbpt_generated_includes.hpp
+./src/graphics/shader_cache/shader_cache.hpp
+./src/graphics/shader_cache/README.md
+./src/graphics/shader_cache/sbpt.ini
+./src/graphics/shader_standard/shader_summary.py
+./src/graphics/shader_standard/shader_standard.hpp
+./src/graphics/shader_standard/main.py
+./src/graphics/shader_standard/.gitignore
+./src/graphics/shader_standard/.git
+./src/graphics/shader_standard/shader_standard.cpp
+./src/graphics/shader_standard/sbpt_generated_includes.hpp
+./src/graphics/shader_standard/colored_print.py
+./src/graphics/shader_standard/README.md
+./src/graphics/shader_standard/sbpt.ini
+./src/graphics/shader_standard/standard.py
+./src/graphics/window/window.hpp
+./src/graphics/window/live_input_state.hpp
+./src/graphics/window/.gitignore
+./src/graphics/window/.git
+./src/graphics/window/sbpt_generated_includes.hpp
+./src/graphics/window/README.md
+./src/graphics/window/sbpt.ini
+./src/graphics/window/window.cpp
+./src/graphics/ui/.gitignore
+./src/graphics/ui/.git
+./src/graphics/ui/sbpt_generated_includes.hpp
+./src/graphics/ui/ui.cpp
+./src/graphics/ui/ui.hpp
+./src/graphics/ui/README.md
+./src/graphics/ui/sbpt.ini
+./src/graphics/batcher/shader_summary.py
+./src/graphics/batcher/.gitmodules
+./src/graphics/batcher/main.py
+./src/graphics/batcher/.gitignore
+./src/graphics/batcher/.git
+./src/graphics/batcher/generated/batcher.hpp
+./src/graphics/batcher/generated/batcher.cpp
+./src/graphics/batcher/generated/transform_v_with_signed_distance_field_text_shader_batcher.cpp
+./src/graphics/batcher/generated/absolute_position_with_colored_vertex_shader_batcher.cpp
+./src/graphics/batcher/generated/absolute_position_with_colored_vertex_shader_batcher.hpp
+./src/graphics/batcher/generated/absolute_position_textured_shader_batcher.hpp
+./src/graphics/batcher/generated/absolute_position_textured_shader_batcher.cpp
+./src/graphics/batcher/generated/absolute_position_with_solid_color_shader_batcher.cpp
+./src/graphics/batcher/generated/absolute_position_with_solid_color_shader_batcher.hpp
+./src/graphics/batcher/generated/transform_v_with_signed_distance_field_text_shader_batcher.hpp
+./src/graphics/batcher/fixed_size_array_tracker.cpp
+./src/graphics/batcher/sbpt_generated_includes.hpp
+./src/graphics/batcher/cpp_utils/main.py
+./src/graphics/batcher/cpp_utils/__init__.py
+./src/graphics/batcher/cpp_utils/.gitignore
+./src/graphics/batcher/cpp_utils/.git
+./src/graphics/batcher/cpp_utils/README.md
+./src/graphics/batcher/batcher_visualization.xpp
+./src/graphics/batcher/batcher_visualization.py
+./src/graphics/batcher/hashing.hpp
+./src/graphics/batcher/README.md
+./src/graphics/batcher/fixed_size_array_tracker.hpp
+./src/graphics/batcher/sbpt.ini
+./src/graphics/batcher/standard.py
+./src/graphics/draw_info/draw_info.hpp
+./src/graphics/draw_info/.gitignore
+./src/graphics/draw_info/.git
+./src/graphics/draw_info/sbpt_generated_includes.hpp
+./src/graphics/draw_info/README.md
+./src/graphics/draw_info/sbpt.ini
+./src/graphics/draw_info/draw_info.cpp
+./src/graphics/transform/transform.hpp
+./src/graphics/transform/.gitignore
+./src/graphics/transform/.git
+./src/graphics/transform/sbpt_generated_includes.hpp
+./src/graphics/transform/transform.cpp
+./src/graphics/transform/README.md
+./src/graphics/transform/sbpt.ini
+./src/graphics/vertex_geometry/.gitignore
+./src/graphics/vertex_geometry/.git
+./src/graphics/vertex_geometry/sbpt_generated_includes.hpp
+./src/graphics/vertex_geometry/vertex_geometry.cpp
+./src/graphics/vertex_geometry/README.md
+./src/graphics/vertex_geometry/vertex_geometry.hpp
+./src/graphics/vertex_geometry/sbpt.ini
+./src/graphics/texture_atlas/texture_atlas.cpp
+./src/graphics/texture_atlas/.gitignore
+./src/graphics/texture_atlas/.git
+./src/graphics/texture_atlas/sbpt_generated_includes.hpp
+./src/graphics/texture_atlas/texture_atlas.hpp
+./src/graphics/texture_atlas/README.md
+./src/graphics/texture_atlas/sbpt.ini
+./src/graphics/viewport/viewport.hpp
+./src/graphics/viewport/viewport.cpp
+./src/main.cpp
+./src/utility/input_state/input_state.cpp
+./src/utility/input_state/input_state.hpp
+./src/utility/input_state/.gitignore
+./src/utility/input_state/sbpt_generated_includes.hpp
+./src/utility/input_state/sbpt.ini
+./src/utility/glfw_lambda_callback_manager/.gitignore
+./src/utility/glfw_lambda_callback_manager/.git
+./src/utility/glfw_lambda_callback_manager/sbpt_generated_includes.hpp
+./src/utility/glfw_lambda_callback_manager/glfw_lambda_callback_manager.hpp
+./src/utility/glfw_lambda_callback_manager/glfw_lambda_callback_manager.cpp
+./src/utility/glfw_lambda_callback_manager/README.md
+./src/utility/glfw_lambda_callback_manager/sbpt.ini
+./src/utility/limited_vector/.gitignore
+./src/utility/limited_vector/sbpt_generated_includes.hpp
+./src/utility/limited_vector/limited_vector.hpp
+./src/utility/limited_vector/sbpt.ini
+./src/utility/limited_vector/limited_vector.tpp
+./src/utility/temporal_binary_signal/temporal_binary_signal.cpp
+./src/utility/temporal_binary_signal/.gitignore
+./src/utility/temporal_binary_signal/.git
+./src/utility/temporal_binary_signal/sbpt_generated_includes.hpp
+./src/utility/temporal_binary_signal/README.md
+./src/utility/temporal_binary_signal/sbpt.ini
+./src/utility/temporal_binary_signal/temporal_binary_signal.hpp
+./src/utility/logger_component/logger_component.cpp
+./src/utility/logger_component/.gitignore
+./src/utility/logger_component/.git
+./src/utility/logger_component/sbpt_generated_includes.hpp
+./src/utility/logger_component/logger_component.hpp
+./src/utility/logger_component/README.md
+./src/utility/logger_component/sbpt.ini
+./src/utility/expiring_temporal_vector/expiring_temporal_vector.hpp
+./src/utility/expiring_temporal_vector/expiring_temporal_vector.tpp
+./src/utility/expiring_temporal_vector/.gitignore
+./src/utility/expiring_temporal_vector/sbpt_generated_includes.hpp
+./src/utility/expiring_temporal_vector/sbpt.ini
+./src/utility/unique_id_generator/.gitignore
+./src/utility/unique_id_generator/.git
+./src/utility/unique_id_generator/sbpt_generated_includes.hpp
+./src/utility/unique_id_generator/unique_id_generator.hpp
+./src/utility/unique_id_generator/README.md
+./src/utility/unique_id_generator/unique_id_generator.cpp
+./src/utility/unique_id_generator/sbpt.ini
+./src/utility/text_buffer/text_buffer.hpp
+./src/utility/text_buffer/text_buffer.cpp
+./src/utility/fs_utils/fs_utils.cpp
+./src/utility/fs_utils/.git
+./src/utility/fs_utils/fs_utils.hpp
+./src/utility/fs_utils/README.md
+./src/utility/fs_utils/sbpt.ini
+./.gitignore
+./CMakeUserPresets.json
+./conanfile.txt
+./.requested_shaders.txt
+./scripts/clang_formatting/.clangd
+./scripts/clang_formatting/main.py
+./scripts/clang_formatting/.gitignore
+./scripts/clang_formatting/.git
+./scripts/clang_formatting/readme.txt
+./scripts/clang_formatting/.clang-format
+./scripts/readme.md
+./scripts/cpp_tbx_submodule_adder/.gitignore
+./scripts/cpp_tbx_submodule_adder/.git
+./scripts/cpp_tbx_submodule_adder/requirements.txt
+./scripts/cpp_tbx_submodule_adder/cpp_tbx_submodule_adder.py
+./scripts/ccgen/ccgen.py
+./scripts/ccgen/.git
+./scripts/ccgen/README.md
+./scripts/.gitmodules
+./scripts/cpp_project_bootstrapper/.gitmodules
+./scripts/cpp_project_bootstrapper/main.py
+./scripts/cpp_project_bootstrapper/mwe_glfw.cpp
+./scripts/cpp_project_bootstrapper/text_utils/.git
+./scripts/cpp_project_bootstrapper/text_utils/README.md
+./scripts/cpp_project_bootstrapper/.git
+./scripts/cpp_project_bootstrapper/demo.gif
+./scripts/cpp_project_bootstrapper/user_input/main.py
+./scripts/cpp_project_bootstrapper/user_input/__init__.py
+./scripts/cpp_project_bootstrapper/user_input/.gitignore
+./scripts/cpp_project_bootstrapper/user_input/.git
+./scripts/cpp_project_bootstrapper/user_input/README.md
+./scripts/cpp_project_bootstrapper/README.md
+./scripts/cpp_project_bootstrapper/fs_utils/main.py
+./scripts/cpp_project_bootstrapper/fs_utils/__init__.py
+./scripts/cpp_project_bootstrapper/fs_utils/.gitignore
+./scripts/cpp_project_bootstrapper/fs_utils/.git
+./scripts/cpp_project_bootstrapper/fs_utils/README.md
+./scripts/sbpt/.gitmodules
+./scripts/sbpt/main.py
+./scripts/sbpt/print_utils/main.py
+./scripts/sbpt/print_utils/__init__.py
+./scripts/sbpt/print_utils/.gitignore
+./scripts/sbpt/print_utils/.git
+./scripts/sbpt/print_utils/README.md
+./scripts/sbpt/.git
+./scripts/sbpt/readme.txt
+./scripts/setup/main.py
+./scripts/setup/batcher.py
+./scripts/setup/fs_utils/main.py
+./scripts/setup/fs_utils/__init__.py
+./scripts/setup/fs_utils/.gitignore
+./scripts/setup/fs_utils/.git
+./scripts/setup/fs_utils/README.md
+./scripts/process_changes_in_submodules/process_changes_in_submodules.py
+./scripts/process_changes_in_submodules/.git
+./scripts/process_changes_in_submodules/README.md
+./scripts/.git
+./scripts/build_notifier/readme.md
+./scripts/build_notifier/.git
+./scripts/build_notifier/build.py
+./scripts/build_notifier/sounds/release_generate_success.wav
+./scripts/build_notifier/sounds/release_build_success.mp3
+./scripts/build_notifier/sounds/debug_generate_success.wav
+./scripts/build_notifier/sounds/debug_build_success.wav
+./scripts/build_notifier/sounds/debug_build_failure.wav
+./scripts/build_notifier/sounds/release_build_failure.mp3
+./scripts/gource_for_submodules/gource_for_submodules.sh
+./scripts/editor_configurations/launch_nvim.py
+./scripts/editor_configurations/.git
+./scripts/editor_configurations/cpp_terminal_autostart.vim
+./scripts/editor_configurations/README.md
+./scripts/cpp_file_generator/cpp_file_generator.py
+./scripts/cpp_file_generator/.git
+./scripts/cpp_file_generator/README.md
+./scripts/textures/json_spritesheet_generator/.git
+./scripts/textures/json_spritesheet_generator/README.md
+./scripts/textures/json_spritesheet_generator/json_spritesheet_generator.py
+./scripts/textures/texture_packer/main.py
+./scripts/textures/texture_packer/generate_visualization_file.py
+./scripts/textures/texture_packer/.git
+./scripts/textures/atlas_visualizer/main.py
+./mwe_shader_cache_logs.txt
+./assets/shaders/main.py
+./assets/shaders/src/signed_distance_field_text.frag
+./assets/shaders/src/model_loading.frag
+./assets/shaders/src/fixed_color_black_temp.frag
+./assets/shaders/src/cubemap.frag
+./assets/shaders/src/solid_color.frag
+./assets/shaders/src/bone_and_CWL_v_transformation_with_texture_coordinate_and_bone_data_passthrough.vert
+./assets/shaders/src/colored_vertices.frag
+./assets/shaders/src/fixed_color.frag
+./assets/shaders/src/CWL_v_transformation.vert
+./assets/shaders/src/textured_with_ambient_and_diffuse_lighting.frag
+./assets/shaders/src/absolute_position.vert
+./assets/shaders/src/textured_with_single_bone_visualization.frag
+./assets/shaders/src/absolute_position_textured.vert
+./assets/shaders/src/colored_vertices.vert
+./assets/shaders/src/textured_with_ambient_lighting.frag
+./assets/shaders/src/cubemap.vert
+./assets/shaders/src/texture_packer/signed_distance_field_text.frag
+./assets/shaders/src/texture_packer/CWL_v_transformation_ubos_1024.vert
+./assets/shaders/src/texture_packer/packed_texture_sampling.glsl
+./assets/shaders/src/texture_packer/bone_and_CWL_v_transformation_ubos_2048_with_lighting_data_passthrough.vert
+./assets/shaders/src/texture_packer/local_to_world_4096_ubo.glsl
+./assets/shaders/src/texture_packer/textured_with_multiple_lights.frag
+./assets/shaders/src/texture_packer/skeletal_animation_100_bones.glsl
+./assets/shaders/src/texture_packer/local_to_world_1024_ubo.glsl
+./assets/shaders/src/texture_packer/bone_and_CWL_v_transformation_with_texture_coordinate_and_bone_data_passthrough.vert
+./assets/shaders/src/texture_packer/textured_with_ambient_and_diffuse_lighting.frag
+./assets/shaders/src/texture_packer/lighting_input_passthrough.glsl
+./assets/shaders/src/texture_packer/textured_with_single_bone_visualization.frag
+./assets/shaders/src/texture_packer/texture_packer_input_passthrough.glsl
+./assets/shaders/src/texture_packer/bone_and_CWL_v_transformation_ubos_4096_with_lighting_data_passthrough.vert
+./assets/shaders/src/texture_packer/CWL_v_transformation_with_texture_coordinate_and_normal_passthrough.vert
+./assets/shaders/src/texture_packer/local_to_world_2048_ubo.glsl
+./assets/shaders/src/texture_packer/bone_and_CWL_v_transformation_ubos_1024_with_lighting_data_passthrough.vert
+./assets/shaders/src/texture_packer/textured.frag
+./assets/shaders/src/texture_packer/lighting.glsl
+./assets/shaders/src/CWL_v_transformation_with_texture_coordinate_and_normal_passthrough.vert
+./assets/shaders/src/README.md
+./assets/shaders/src/CWL_uniforms.glsl
+./assets/shaders/src/text.vert
+./assets/shaders/src/CWL_v_transformation_with_texture_coordinate_passthrough.vert
+./assets/shaders/src/CWL_v_transformation_ubos.vert
+./assets/shaders/src/sbpt.ini
+./assets/shaders/src/textured.frag
+./assets/shaders/src/text.frag
+./assets/shaders/src/transform_v_with_texture_coordinate_passthrough.vert
+./assets/shaders/.gitignore
+./assets/shaders/shader_compiler.log
+./assets/shaders/.git
+./assets/shaders/out/signed_distance_field_text.frag
+./assets/shaders/out/model_loading.frag
+./assets/shaders/out/fixed_color_black_temp.frag
+./assets/shaders/out/cubemap.frag
+./assets/shaders/out/solid_color.frag
+./assets/shaders/out/bone_and_CWL_v_transformation_with_texture_coordinate_and_bone_data_passthrough.vert
+./assets/shaders/out/colored_vertices.frag
+./assets/shaders/out/fixed_color.frag
+./assets/shaders/out/CWL_v_transformation.vert
+./assets/shaders/out/textured_with_ambient_and_diffuse_lighting.frag
+./assets/shaders/out/absolute_position.vert
+./assets/shaders/out/textured_with_single_bone_visualization.frag
+./assets/shaders/out/absolute_position_textured.vert
+./assets/shaders/out/colored_vertices.vert
+./assets/shaders/out/textured_with_ambient_lighting.frag
+./assets/shaders/out/cubemap.vert
+./assets/shaders/out/texture_packer/signed_distance_field_text.frag
+./assets/shaders/out/texture_packer/CWL_v_transformation_ubos_1024.vert
+./assets/shaders/out/texture_packer/packed_texture_sampling.glsl
+./assets/shaders/out/texture_packer/bone_and_CWL_v_transformation_ubos_2048_with_lighting_data_passthrough.vert
+./assets/shaders/out/texture_packer/local_to_world_4096_ubo.glsl
+./assets/shaders/out/texture_packer/textured_with_multiple_lights.frag
+./assets/shaders/out/texture_packer/skeletal_animation_100_bones.glsl
+./assets/shaders/out/texture_packer/local_to_world_1024_ubo.glsl
+./assets/shaders/out/texture_packer/bone_and_CWL_v_transformation_with_texture_coordinate_and_bone_data_passthrough.vert
+./assets/shaders/out/texture_packer/textured_with_ambient_and_diffuse_lighting.frag
+./assets/shaders/out/texture_packer/lighting_input_passthrough.glsl
+./assets/shaders/out/texture_packer/textured_with_single_bone_visualization.frag
+./assets/shaders/out/texture_packer/texture_packer_input_passthrough.glsl
+./assets/shaders/out/texture_packer/bone_and_CWL_v_transformation_ubos_4096_with_lighting_data_passthrough.vert
+./assets/shaders/out/texture_packer/CWL_v_transformation_with_texture_coordinate_and_normal_passthrough.vert
+./assets/shaders/out/texture_packer/local_to_world_2048_ubo.glsl
+./assets/shaders/out/texture_packer/bone_and_CWL_v_transformation_ubos_1024_with_lighting_data_passthrough.vert
+./assets/shaders/out/texture_packer/textured.frag
+./assets/shaders/out/texture_packer/lighting.glsl
+./assets/shaders/out/CWL_v_transformation_with_texture_coordinate_and_normal_passthrough.vert
+./assets/shaders/out/CWL_uniforms.glsl
+./assets/shaders/out/text.vert
+./assets/shaders/out/CWL_v_transformation_with_texture_coordinate_passthrough.vert
+./assets/shaders/out/CWL_v_transformation_ubos.vert
+./assets/shaders/out/textured.frag
+./assets/shaders/out/text.frag
+./assets/shaders/out/transform_v_with_texture_coordinate_passthrough.vert
+./assets/fonts/times_64_sdf_atlas.png
+./assets/fonts/times_64_sdf_atlas.json
+./assets/fonts/times_64_sdf_atlas_font_info.json
+./assets/font/font.json
+./assets/font/container_0_atlas_visualization.png
+./assets/font/font.png
+./.clang-format
+./README.md
+./CMakeLists.txt
+after constructor

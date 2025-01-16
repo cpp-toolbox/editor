@@ -6,6 +6,7 @@ glm/cci.20230113
 stb/cci.20230920
 nlohmann_json/3.11.3
 assimp/5.4.3
+rapidfuzz/3.1.1
 
 [generators]
 CMakeDeps

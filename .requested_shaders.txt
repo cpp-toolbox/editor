@@ -1,2 +1,4 @@
 absolute_position_with_solid_color
 absolute_position_textured
+transform_v_with_signed_distance_field_text
+absolute_position_with_colored_vertex
