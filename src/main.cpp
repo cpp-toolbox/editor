@@ -703,6 +703,24 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                     viewport.buffer.redo();
                 }
             }
+            if (ip(EKey::LEFT_SHIFT)) {
+	    	
+		if(jp(EKey::g)) {			
+    			int last_line_index = viewport.buffer.line_count() - 1; 
+			viewport.set_active_buffer_line_under_cursor(last_line_index);
+		}
+		
+		if(jp(EKey::t)) {			
+			viewport.set_active_buffer_line_under_cursor(0);
+		}
+		
+
+		if(jp(EKey::m)) {			
+    			int last_line_index = (viewport.buffer.line_count() - 1)/ 2; 
+			viewport.set_active_buffer_line_under_cursor(last_line_index);
+		}
+	    }
+
             if (jp(EKey::LEFT_SHIFT)) {
                 if (jp(EKey::n)) {
                     // Check if there are any search results
