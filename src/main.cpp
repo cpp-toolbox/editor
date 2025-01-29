@@ -1,5 +1,7 @@
 // ABOUTODO
-// idk why renderdoc doesn't work rn, look at that later
+//
+// next up load in previous buffer by reference instead of creating a new one, also have a list of opened ones.
+//
 // generalize how the regex matching works.
 // add change background color and text color of an entry
 // add logic for going up and down in the search menu
