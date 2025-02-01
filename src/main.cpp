@@ -1,9 +1,3 @@
-// ABOUTODO
-//
-// next up load in previous buffer by reference instead of creating a new one, also have a list of opened ones.
-//
-// generalize how the regex matching works.
-// add change background color and text color of an entry
 // add logic for going up and down in the search menu
 // add in multiple textbuffers for a viewport
 // eventually get to highlighting, later on though check out
@@ -32,6 +26,7 @@
 #include "utility/temporal_binary_signal/temporal_binary_signal.hpp"
 #include "utility/text_buffer/text_buffer.hpp"
 #include "utility/input_state/input_state.hpp"
+#include "utility/regex_command_runner/regex_command_runner.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -702,22 +697,21 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                 }
             }
             if (ip(EKey::LEFT_SHIFT)) {
-	    	
-		if(jp(EKey::g)) {			
-    			int last_line_index = viewport.buffer.line_count() - 1; 
-			viewport.set_active_buffer_line_under_cursor(last_line_index);
-		}
-		
-		if(jp(EKey::t)) {			
-			viewport.set_active_buffer_line_under_cursor(0);
-		}
-		
 
-		if(jp(EKey::m)) {			
-    			int last_line_index = (viewport.buffer.line_count() - 1)/ 2; 
-			viewport.set_active_buffer_line_under_cursor(last_line_index);
-		}
-	    }
+                if (jp(EKey::g)) {
+                    int last_line_index = viewport.buffer.line_count() - 1;
+                    viewport.set_active_buffer_line_under_cursor(last_line_index);
+                }
+
+                if (jp(EKey::t)) {
+                    viewport.set_active_buffer_line_under_cursor(0);
+                }
+
+                if (jp(EKey::m)) {
+                    int last_line_index = (viewport.buffer.line_count() - 1) / 2;
+                    viewport.set_active_buffer_line_under_cursor(last_line_index);
+                }
+            }
 
             if (jp(EKey::LEFT_SHIFT)) {
                 if (jp(EKey::n)) {
@@ -812,6 +806,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
 
 int main(int argc, char *argv[]) {
 
+    RegexCommandRunner rcr;
     std::cout << get_executable_path(argv) << std::endl;
 
     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
@@ -993,14 +988,14 @@ int main(int argc, char *argv[]) {
 
             Key &enum_grabbed_key = *input_state.key_enum_to_object.at(active_key.key_enum);
 
-            if(current_mode == MOVE_AND_EDIT && command_bar_input == ":"){
+            if (current_mode == MOVE_AND_EDIT && command_bar_input == ":") {
                 command_bar_input = "";
                 command_bar_input_signal.toggle_state();
             }
 
             if (current_mode == MOVE_AND_EDIT) {
                 if (action == GLFW_PRESS) {
-                    if (active_key.key_type == KeyType::ALPHA or active_key.key_type == KeyType::NUMERIC or 
+                    if (active_key.key_type == KeyType::ALPHA or active_key.key_type == KeyType::NUMERIC or
                         active_key.string_repr == "escape") {
 
                         if (mods & GLFW_MOD_SHIFT) {
@@ -1010,14 +1005,14 @@ int main(int argc, char *argv[]) {
                         }
                         std::string key_str = active_key.string_repr;
 
-                        //print out the key that was just pressed
+                        // print out the key that was just pressed
                         std::cout << "key_str:" << key_str << std::endl;
 
-                        if(key_str == "u" && viewport.buffer.get_last_deleted_content() == ""){
+                        if (key_str == "u" && viewport.buffer.get_last_deleted_content() == "") {
                             command_bar_input = "Ain't no more history!";
                             command_bar_input_signal.toggle_state();
                         }
-                        
+
                         // maybe this can be generalized to unary, binary etc type commands
                         std::vector<std::string> potential_automatic_command_prefixes = {"d", "c", "y", "f", "F", "t",
                                                                                          "T",
@@ -1029,16 +1024,15 @@ int main(int argc, char *argv[]) {
                             move_and_edit_arcr.command_started;
                         bool control_not_pressed =
                             input_state.key_enum_to_object.at(EKey::LEFT_CONTROL)->pressed_signal.is_off();
-                        if(key_str != "escape"){
+                        if (key_str != "escape") {
                             if (command_started_or_continuing and control_not_pressed) {
                                 potential_automatic_command += key_str;
                                 std::cout << "command: " << potential_automatic_command << std::endl;
-                                std::cout << "----------" << std::endl; 
+                                std::cout << "----------" << std::endl;
 
                                 command_bar_input = potential_automatic_command;
                                 command_bar_input_signal.toggle_state();
 
-                                
                                 if (potential_automatic_command.length() > 3) {
                                     potential_automatic_command = potential_automatic_command.substr(1);
                                 }
@@ -1052,7 +1046,7 @@ int main(int argc, char *argv[]) {
                             command_bar_input = "";
                             command_bar_input_signal.toggle_state();
                             std::cout << "command ended: " << potential_automatic_command << std::endl;
-                            std::cout << "----------" << std::endl; 
+                            std::cout << "----------" << std::endl;
                         }
                     }
                     if (active_key.key_enum == EKey::ESCAPE or active_key.key_enum == EKey::CAPS_LOCK) {
