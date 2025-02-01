@@ -615,8 +615,6 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
     if (move_and_edit_arcr.command_started) {
         // then forget all other logic and only allow for text entry there
         if (jp(EKey::ESCAPE)) {
-            command_bar_input = "";
-            command_bar_input_signal.toggle_state();
             current_mode = MOVE_AND_EDIT;
             mode_change_signal.toggle_state();
         }
@@ -822,7 +820,7 @@ int main(int argc, char *argv[]) {
     file_sink->set_level(spdlog::level::info);
     std::vector<spdlog::sink_ptr> sinks = {console_sink, file_sink};
 
-    bool start_in_fullscreen = true;
+    bool start_in_fullscreen = false;
     GLFWwindow *window = initialize_glfw_glad_and_return_window(SCREEN_WIDTH, SCREEN_HEIGHT, "glfw window",
                                                                 start_in_fullscreen, false, false);
 
@@ -995,9 +993,15 @@ int main(int argc, char *argv[]) {
 
             Key &enum_grabbed_key = *input_state.key_enum_to_object.at(active_key.key_enum);
 
+            if(current_mode == MOVE_AND_EDIT && command_bar_input == ":"){
+                command_bar_input = "";
+                command_bar_input_signal.toggle_state();
+            }
+
             if (current_mode == MOVE_AND_EDIT) {
                 if (action == GLFW_PRESS) {
-                    if (active_key.key_type == KeyType::ALPHA or active_key.key_type == KeyType::NUMERIC) {
+                    if (active_key.key_type == KeyType::ALPHA or active_key.key_type == KeyType::NUMERIC or 
+                        active_key.string_repr == "escape") {
 
                         if (mods & GLFW_MOD_SHIFT) {
                             if (active_key.shiftable) {
@@ -1005,6 +1009,15 @@ int main(int argc, char *argv[]) {
                             }
                         }
                         std::string key_str = active_key.string_repr;
+
+                        //print out the key that was just pressed
+                        std::cout << "key_str:" << key_str << std::endl;
+
+                        if(key_str == "u" && viewport.buffer.get_last_deleted_content() == ""){
+                            command_bar_input = "Ain't no more history!";
+                            command_bar_input_signal.toggle_state();
+                        }
+                        
                         // maybe this can be generalized to unary, binary etc type commands
                         std::vector<std::string> potential_automatic_command_prefixes = {"d", "c", "y", "f", "F", "t",
                                                                                          "T",
@@ -1016,18 +1029,30 @@ int main(int argc, char *argv[]) {
                             move_and_edit_arcr.command_started;
                         bool control_not_pressed =
                             input_state.key_enum_to_object.at(EKey::LEFT_CONTROL)->pressed_signal.is_off();
-                        if (command_started_or_continuing and control_not_pressed) {
-                            potential_automatic_command += key_str;
-                            if (potential_automatic_command.length() > 3) {
-                                potential_automatic_command = potential_automatic_command.substr(1);
+                        if(key_str != "escape"){
+                            if (command_started_or_continuing and control_not_pressed) {
+                                potential_automatic_command += key_str;
+                                std::cout << "command: " << potential_automatic_command << std::endl;
+                                std::cout << "----------" << std::endl; 
+
+                                command_bar_input = potential_automatic_command;
+                                command_bar_input_signal.toggle_state();
+
+                                
+                                if (potential_automatic_command.length() > 3) {
+                                    potential_automatic_command = potential_automatic_command.substr(1);
+                                }
                             }
-                            std::cout << potential_automatic_command << std::endl;
                         }
                         bool command_was_run = move_and_edit_arcr.potentially_run_normal_mode_command(
                             potential_automatic_command, viewport, current_mode, mode_change_signal, window,
                             fs_browser_is_active);
-                        if (command_was_run) {
+                        if (command_was_run | key_str == "escape") {
                             potential_automatic_command = "";
+                            command_bar_input = "";
+                            command_bar_input_signal.toggle_state();
+                            std::cout << "command ended: " << potential_automatic_command << std::endl;
+                            std::cout << "----------" << std::endl; 
                         }
                     }
                     if (active_key.key_enum == EKey::ESCAPE or active_key.key_enum == EKey::CAPS_LOCK) {
