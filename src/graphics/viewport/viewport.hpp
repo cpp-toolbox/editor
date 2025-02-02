@@ -22,8 +22,10 @@ class Viewport {
     void scroll_right();
 
     char get_symbol_at(int line, int col) const;
-
-    void move_cursor_forward_until_end_of_word();
+    void move_cursor_to(int line, int col);
+    void move_cursor_forward_until_end_of_word(); 
+    void move_cursor_forward_until_next_right_bracket();
+    void move_cursor_backward_until_next_left_bracket();
     void move_cursor_forward_by_word();
     void move_cursor_backward_until_start_of_word();
     void move_cursor_backward_by_word();

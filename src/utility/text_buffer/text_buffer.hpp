@@ -67,6 +67,8 @@ class LineTextBuffer {
 
     int find_forward_by_word_index(int line_index, int col_index);
     int find_forward_to_end_of_word(int line_index, int col_index);
+    int find_column_index_of_next_right_bracket(int line_index, int col_index);
+    int find_column_index_of_previous_left_bracket(int linx_index, int col_index);
 
     int find_backward_by_word_index(int line_index, int col_index);
     int find_backward_to_start_of_word(int line_index, int col_index);

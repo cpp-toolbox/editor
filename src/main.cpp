@@ -649,8 +649,26 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
             viewport.move_cursor_forward_until_end_of_word();
         }
 
+        if(jp(EKey::z)){
+            int left_bracket_column = 
+                viewport.buffer.find_column_index_of_previous_left_bracket(
+                    viewport.active_buffer_line_under_cursor,
+                     viewport.active_buffer_col_under_cursor) + 1;
+            int right_bracket_column = 
+                viewport.buffer.find_column_index_of_next_right_bracket(
+                    viewport.active_buffer_line_under_cursor,
+                     viewport.active_buffer_col_under_cursor) - 1;
+            viewport.buffer.delete_bounding_box(
+                viewport.active_buffer_line_under_cursor,
+                right_bracket_column,
+                viewport.active_buffer_line_under_cursor, 
+                left_bracket_column
+            ); 
+                viewport.set_active_buffer_line_col_under_cursor(viewport.active_buffer_line_under_cursor, left_bracket_column);
+        }
+
         if (ip(EKey::LEFT_SHIFT)) {
-            viewport.move_cursor_backward_until_start_of_word();
+            /*viewport.move_cursor_backward_until_start_of_word();*/
         } else {
             if (jp(EKey::b)) {
                 viewport.move_cursor_backward_by_word();

@@ -386,6 +386,34 @@ int LineTextBuffer::find_forward_by_word_index(int line_index, int col_index) {
     return col_index; // Return the updated column index
 }
 
+int LineTextBuffer::find_column_index_of_next_right_bracket(int line_index, int col_index) {
+    bool got_passed_end_of_document = line_index < lines.size();
+    if (got_passed_end_of_document) { // Ensure line_index is valid
+        const std::string &line = get_line(line_index);
+
+        //TODO:this should be generalized to multiple lines 
+        while (col_index < line.size() && line[col_index] != ')') {
+            ++col_index;
+        }
+    }
+
+    return col_index; // Return the updated column index
+}
+
+int LineTextBuffer::find_column_index_of_previous_left_bracket(int line_index, int col_index) {
+    bool got_passed_end_of_document = line_index < lines.size();
+    if (got_passed_end_of_document) { // Ensure line_index is valid
+        const std::string &line = get_line(line_index);
+
+        //TODO:this should be generalized to multiple lines 
+        while (col_index > 0 && line[col_index] != '(') {
+            --col_index;
+        }
+    }
+
+    return col_index; // Return the updated column index
+}
+
 int LineTextBuffer::find_forward_to_end_of_word(int line_index, int col_index) {
     if (line_index < lines.size()) { // Ensure line_index is valid
         const std::string &line = get_line(line_index);

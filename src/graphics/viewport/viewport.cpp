@@ -139,13 +139,21 @@ bool Viewport::insert_character_at(int line, int col, char character) {
     }
     return false;
 }
-
 void Viewport::move_cursor_forward_until_end_of_word() {
     active_buffer_col_under_cursor =
         buffer.find_forward_to_end_of_word(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
     moved_signal.toggle_state();
 }
-
+void Viewport::move_cursor_forward_until_next_right_bracket() {
+    active_buffer_col_under_cursor =
+        buffer.find_column_index_of_next_right_bracket(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
+    moved_signal.toggle_state();
+}
+void Viewport::move_cursor_backward_until_next_left_bracket() {
+    active_buffer_col_under_cursor =
+        buffer.find_column_index_of_previous_left_bracket(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
+    moved_signal.toggle_state();
+}
 void Viewport::move_cursor_forward_by_word() {
     active_buffer_col_under_cursor =
         buffer.find_forward_by_word_index(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
