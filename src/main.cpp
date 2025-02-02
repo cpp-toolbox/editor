@@ -383,7 +383,8 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                    std::vector<int> &doids_for_textboxes_for_active_directory_for_later_removal, UI &fs_browser,
                    TemporalBinarySignal &search_results_changed_signal, int &selected_file_doid,
                    std::vector<std::string> &currently_matched_files, RegexCommandRunner &rcr,
-                   std::string &potential_regex_command, bool &configured_rcr) {
+                   std::string &potential_regex_command, bool &configured_rcr,
+                   TemporalBinarySignal &insert_mode_signal) {
 
     if (not configured_rcr) {
 
@@ -393,10 +394,30 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
             line_where_selection_mode_started = viewport.active_buffer_line_under_cursor;
             col_where_selection_mode_started = viewport.active_buffer_col_under_cursor;
         });
-        rcr.add_regex("j", [&](const std::smatch &m) { viewport.scroll_down(); });
-        rcr.add_regex("k", [&](const std::smatch &m) { viewport.scroll_up(); });
-        rcr.add_regex("h", [&](const std::smatch &m) { viewport.scroll_left(); });
-        rcr.add_regex("l", [&](const std::smatch &m) { viewport.scroll_right(); });
+
+        rcr.add_regex("^i", [&](const std::smatch &m) {
+            if (current_mode == MOVE_AND_EDIT) {
+                current_mode = INSERT;
+                insert_mode_signal.toggle_state();
+                mode_change_signal.toggle_state();
+            }
+        });
+        rcr.add_regex("j", [&](const std::smatch &m) {
+            if (current_mode == MOVE_AND_EDIT)
+                viewport.scroll_down();
+        });
+        rcr.add_regex("k", [&](const std::smatch &m) {
+            if (current_mode == MOVE_AND_EDIT)
+                viewport.scroll_up();
+        });
+        rcr.add_regex("h", [&](const std::smatch &m) {
+            if (current_mode == MOVE_AND_EDIT)
+                viewport.scroll_left();
+        });
+        rcr.add_regex("l", [&](const std::smatch &m) {
+            if (current_mode == MOVE_AND_EDIT)
+                viewport.scroll_right();
+        });
         rcr.add_regex(R"((\d*)G)", [&](const std::smatch &m) {
             std::string digits = m[1].str();
 
@@ -1002,11 +1023,7 @@ int main(int argc, char *argv[]) {
                 // this case switch is so BS, need to use the frag-z thing for handling keyboard input, take a look at
                 // that again.
             case GLFW_KEY_I:
-                if (current_mode == MOVE_AND_EDIT) {
-                    current_mode = INSERT;
-                    insert_mode_signal.toggle_state();
-                    mode_change_signal.toggle_state();
-                }
+
                 break;
             case GLFW_KEY_CAPS_LOCK:
                 current_mode = MOVE_AND_EDIT;
@@ -1158,7 +1175,7 @@ int main(int argc, char *argv[]) {
                       command_bar_input_signal, window, is_search_active, fs_browser_is_active, fs_browser_search_query,
                       searchable_files, fb, doids_for_textboxes_for_active_directory_for_later_removal, fs_browser,
                       search_results_changed_signal, selected_file_doid, currently_matched_files, rcr,
-                      potential_regex_command, configured_rcr);
+                      potential_regex_command, configured_rcr, insert_mode_signal);
 
         TemporalBinarySignal::process_all();
         glfwSwapBuffers(window);
