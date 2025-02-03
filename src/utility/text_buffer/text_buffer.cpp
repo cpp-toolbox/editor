@@ -72,20 +72,28 @@ bool LineTextBuffer::delete_character(int line_index, int col_index) {
 }
 
 bool LineTextBuffer::insert_character(int line_index, int col_index, char character) {
+    // Ensure the line_index is within bounds, adding new lines if necessary
     if (line_index >= lines.size()) {
-        std::cerr << "Error: line index out of bounds.\n";
-        return false;
-    }
-    if (col_index > lines[line_index].size()) {
-        lines[line_index].resize(col_index, ' ');
+        lines.resize(line_index + 1, std::string()); // Adds empty lines up to line_index
     }
 
+    // Ensure the col_index is within bounds, adding spaces if necessary
+    if (col_index > lines[line_index].size()) {
+        lines[line_index].resize(col_index, ' '); // Resizes with spaces to the desired column index
+    }
+
+    // Insert the character at the specified column index
     lines[line_index].insert(col_index, 1, character);
 
+    // TODO: if we add new lines and stuff do we need to register those diffs as well?
     // Record the change in the undo stack
+
     undo_stack.push(Diff(Diff::Type::INSERT, line_index, col_index, std::string(1, character)));
+
+    // Toggle edit signal and mark as modified
     edit_signal.toggle_state();
     modified_without_save = true;
+
     return true;
 }
 

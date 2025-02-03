@@ -463,7 +463,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
             }
         });
         rcr.add_regex(R"(^(\d*)([jklh]))", [&](const std::smatch &m) {
-            if (current_mode == MOVE_AND_EDIT) {
+            if (current_mode == MOVE_AND_EDIT or current_mode == VISUAL_SELECT) {
                 int count = m[1].str().empty() ? 1 : std::stoi(m[1].str());
                 char direction = m[2].str()[0];
 
@@ -630,9 +630,16 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                 viewport.set_active_buffer_line_under_cursor(0);
             }
         });
-        rcr.add_regex("^o", [&](const std::smatch &m) {
+        rcr.add_regex("^[oO]", [&](const std::smatch &m) {
             if (current_mode == MOVE_AND_EDIT) {
-                viewport.create_new_line_at_cursor_and_scroll_down();
+                if (m.str() == "O") {
+                    // Create a new line above the cursor and scroll up
+                    viewport.create_new_line_above_cursor_and_scroll_up();
+                } else {
+                    // Create a new line below the cursor and scroll down
+                    viewport.create_new_line_at_cursor_and_scroll_down();
+                }
+
                 current_mode = INSERT;
                 insert_mode_signal.toggle_state();
                 mode_change_signal.toggle_state();

@@ -23,7 +23,7 @@ class Viewport {
 
     char get_symbol_at(int line, int col) const;
     void move_cursor_to(int line, int col);
-    void move_cursor_forward_until_end_of_word(); 
+    void move_cursor_forward_until_end_of_word();
     void move_cursor_forward_until_next_right_bracket();
     void move_cursor_backward_until_next_left_bracket();
     void move_cursor_forward_by_word();
@@ -33,6 +33,7 @@ class Viewport {
     void move_cursor_to_end_of_line();
     void move_cursor_to_middle_of_line();
 
+    bool create_new_line_above_cursor_and_scroll_up();
     bool create_new_line_at_cursor_and_scroll_down();
     bool insert_tab_at_cursor();
     bool insert_character_at_cursor(char character);

@@ -239,6 +239,29 @@ void Viewport::move_cursor_to_middle_of_line() {
     moved_signal.toggle_state();
 }
 
+bool Viewport::create_new_line_above_cursor_and_scroll_up() {
+    // Get the current cursor position
+    int line_index = active_buffer_line_under_cursor;
+
+    // Ensure the line index is valid within the buffer's bounds
+    if (line_index < 0 || line_index > buffer.line_count()) {
+        return false;
+    }
+
+    // Insert the new line at the correct position in the buffer
+    if (!buffer.insert_blank_line(line_index)) {
+        return false;
+    }
+
+    // I actualy realized no scrolling is reqiured because it pushes everything down, potential torename func
+
+    set_active_buffer_col_under_cursor(0);
+    // Optionally: Adjust any other properties related to the cursor or viewport
+    // after inserting the new line, such as moving the cursor to the beginning of the new line.
+
+    return true;
+}
+
 bool Viewport::create_new_line_at_cursor_and_scroll_down() {
     // Get the current cursor position
     int line_index = active_buffer_line_under_cursor;
