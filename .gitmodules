@@ -64,3 +64,6 @@
 [submodule "src/utility/regex_command_runner"]
 	path = src/utility/regex_command_runner
 	url = git@github.com:cpp-toolbox/regex_command_runner.git
+[submodule "src/utility/periodic_signal"]
+	path = src/utility/periodic_signal
+	url = git@github.com:cpp-toolbox/periodic_signal.git

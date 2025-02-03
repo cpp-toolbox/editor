@@ -28,6 +28,7 @@
 #include "utility/text_buffer/text_buffer.hpp"
 #include "utility/input_state/input_state.hpp"
 #include "utility/regex_command_runner/regex_command_runner.hpp"
+#include "utility/periodic_signal/periodic_signal.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -144,7 +145,8 @@ void render(Viewport &viewport, Grid &screen_grid, Grid &status_bar_grid, Grid &
             TemporalBinarySignal &mode_change_signal, TemporalBinarySignal &command_bar_input_signal, int center_idx_x,
             int center_idx_y, int num_cols, int num_lines, int col_where_selection_mode_started,
             int line_where_selection_mode_started, EditorMode &current_mode, ShaderCache &shader_cache,
-            std::unordered_map<EditorMode, glm::vec4> &mode_to_cursor_color) {
+            std::unordered_map<EditorMode, glm::vec4> &mode_to_cursor_color, double delta_time,
+            PeriodicSignal &one_second_signal_for_status_bar_time_update) {
 
     bool should_replace = viewport.moved_signal.has_just_changed() or viewport.buffer.edit_signal.has_just_changed();
 
@@ -178,6 +180,8 @@ void render(Viewport &viewport, Grid &screen_grid, Grid &status_bar_grid, Grid &
         get_mode_string(current_mode) + " | " + extract_filename(viewport.buffer.current_file_path) +
         (viewport.buffer.modified_without_save ? "[+]" : "") + " | " + get_current_time_string() + " |";
 
+    bool should_update_status_bar = one_second_signal_for_status_bar_time_update.process_and_get_signal();
+
     for (int line = 0; line < status_bar_grid.rows; line++) {
         for (int col = 0; col < status_bar_grid.cols; col++) {
 
@@ -196,7 +200,7 @@ void render(Viewport &viewport, Grid &screen_grid, Grid &status_bar_grid, Grid &
             adjust_uv_coordinates_in_place(cell_char_tcs, 0.017, 0.045, 0.01);
 
             batcher.absolute_position_textured_shader_batcher.queue_draw(
-                unique_idx, cell_ivs.indices, cell_ivs.vertices, cell_char_tcs, mode_change_signal.has_just_changed());
+                unique_idx, cell_ivs.indices, cell_ivs.vertices, cell_char_tcs, should_update_status_bar);
             unique_idx++;
         }
     }
@@ -377,7 +381,7 @@ void update_search_results(std::string &fs_browser_search_query, std::vector<std
 void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBinarySignal &mode_change_signal,
                    Viewport &viewport, int &line_where_selection_mode_started, int &col_where_selection_mode_started,
                    std::vector<SubTextIndex> &search_results, int &current_search_index, std::string &command_bar_input,
-                   TemporalBinarySignal &command_bar_input_signal, GLFWwindow *window, bool &is_search_active,
+                   TemporalBinarySignal &command_bar_input_signal, Window window, bool &is_search_active,
                    bool &fs_browser_is_active, std::string &fs_browser_search_query,
                    std::vector<std::filesystem::path> &searchable_files, FileBrowser &fb,
                    std::vector<int> &doids_for_textboxes_for_active_directory_for_later_removal, UI &fs_browser,
@@ -387,6 +391,36 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                    TemporalBinarySignal &insert_mode_signal) {
 
     if (not configured_rcr) {
+
+        rcr.add_regex("^m", [&](const std::smatch &m) {
+            if (current_mode == MOVE_AND_EDIT || current_mode == VISUAL_SELECT) {
+                viewport.move_cursor_to_middle_of_line();
+            }
+        });
+        rcr.add_regex("^\\$", [&](const std::smatch &m) {
+            if (current_mode == MOVE_AND_EDIT || current_mode == VISUAL_SELECT) {
+                viewport.move_cursor_to_end_of_line();
+            }
+        });
+        rcr.add_regex("^[pP]", [&](const std::smatch &m) {
+            if (current_mode == MOVE_AND_EDIT) {
+                if (m.str(0) == "P") {
+                    // Uppercase 'P' - insert content from the clipboard
+                    const char *clipboard_content = glfwGetClipboardString(window.glfw_window);
+                    if (clipboard_content) {
+                        viewport.insert_string_at_cursor(clipboard_content);
+                    }
+                } else if (m.str(0) == "p") {
+                    // Lowercase 'p' - insert the last deleted content
+                    viewport.insert_string_at_cursor(viewport.buffer.get_last_deleted_content());
+                }
+            }
+        });
+        rcr.add_regex("^0", [&](const std::smatch &m) {
+            if (current_mode == MOVE_AND_EDIT || current_mode == VISUAL_SELECT) {
+                viewport.move_cursor_to_start_of_line();
+            }
+        });
 
         rcr.add_regex("v", [&](const std::smatch &m) {
             current_mode = VISUAL_SELECT;
@@ -428,21 +462,30 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                 mode_change_signal.toggle_state();
             }
         });
-        rcr.add_regex("j", [&](const std::smatch &m) {
-            if (current_mode == MOVE_AND_EDIT)
-                viewport.scroll_down();
-        });
-        rcr.add_regex("k", [&](const std::smatch &m) {
-            if (current_mode == MOVE_AND_EDIT)
-                viewport.scroll_up();
-        });
-        rcr.add_regex("h", [&](const std::smatch &m) {
-            if (current_mode == MOVE_AND_EDIT)
-                viewport.scroll_left();
-        });
-        rcr.add_regex("l", [&](const std::smatch &m) {
-            if (current_mode == MOVE_AND_EDIT)
-                viewport.scroll_right();
+        rcr.add_regex(R"(^(\d*)([jklh]))", [&](const std::smatch &m) {
+            if (current_mode == MOVE_AND_EDIT) {
+                int count = m[1].str().empty() ? 1 : std::stoi(m[1].str());
+                char direction = m[2].str()[0];
+
+                int line_delta = 0, col_delta = 0;
+                switch (direction) {
+                case 'j':
+                    line_delta = count;
+                    break; // Scroll down
+                case 'k':
+                    line_delta = -count;
+                    break; // Scroll up
+                case 'h':
+                    col_delta = -count;
+                    break; // Scroll left
+                case 'l':
+                    col_delta = count;
+                    break; // Scroll right
+                }
+
+                std::cout << line_delta << col_delta << std::endl;
+                viewport.scroll(line_delta, col_delta);
+            }
         });
         rcr.add_regex(R"((\d*)G)", [&](const std::smatch &m) {
             std::string digits = m[1].str();
@@ -582,12 +625,12 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
             viewport.set_active_buffer_line_col_under_cursor(viewport.active_buffer_line_under_cursor, left_match_col);
         });
 
-        rcr.add_regex("gg", [&](const std::smatch &m) {
+        rcr.add_regex("^gg", [&](const std::smatch &m) {
             if (current_mode == MOVE_AND_EDIT) {
                 viewport.set_active_buffer_line_under_cursor(0);
             }
         });
-        rcr.add_regex("o", [&](const std::smatch &m) {
+        rcr.add_regex("^o", [&](const std::smatch &m) {
             if (current_mode == MOVE_AND_EDIT) {
                 viewport.create_new_line_at_cursor_and_scroll_down();
                 current_mode = INSERT;
@@ -596,30 +639,30 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
             }
         });
 
-        rcr.add_regex("u", [&](const std::smatch &m) {
+        rcr.add_regex("^u", [&](const std::smatch &m) {
             if (current_mode == MOVE_AND_EDIT) {
                 viewport.buffer.undo();
             }
         });
-        rcr.add_regex("r", [&](const std::smatch &m) {
+        rcr.add_regex("^r", [&](const std::smatch &m) {
             if (current_mode == MOVE_AND_EDIT) {
                 viewport.buffer.redo();
             }
         });
-        rcr.add_regex(" sf", [&](const std::smatch &m) {
+        rcr.add_regex("^ sf", [&](const std::smatch &m) {
             if (current_mode == MOVE_AND_EDIT) {
                 fs_browser_is_active = true;
             }
         });
-        rcr.add_regex("dd", [&](const std::smatch &m) {
+        rcr.add_regex("^dd", [&](const std::smatch &m) {
             if (current_mode == MOVE_AND_EDIT) {
                 viewport.delete_line_at_cursor();
             }
         });
-        rcr.add_regex("yy", [&](const std::smatch &m) {
+        rcr.add_regex("^yy", [&](const std::smatch &m) {
             if (current_mode == MOVE_AND_EDIT) {
                 std::string current_line = viewport.buffer.get_line(viewport.active_buffer_line_under_cursor);
-                glfwSetClipboardString(window, current_line.c_str());
+                glfwSetClipboardString(window.glfw_window, current_line.c_str());
             }
         });
 
@@ -650,13 +693,16 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
             potential_regex_command = "";
         }
 
+        bool key_pressed_based_command_run = false;
         if (current_mode == MOVE_AND_EDIT) {
             if (ip(EKey::LEFT_CONTROL)) {
                 if (jp(EKey::u)) {
                     viewport.scroll(-5, 0);
+                    key_pressed_based_command_run = true;
                 }
                 if (jp(EKey::d)) {
                     viewport.scroll(5, 0);
+                    key_pressed_based_command_run = true;
                 }
             }
             if (ip(EKey::LEFT_SHIFT)) {
@@ -664,6 +710,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                 if (jp(EKey::m)) {
                     int last_line_index = (viewport.buffer.line_count() - 1) / 2;
                     viewport.set_active_buffer_line_under_cursor(last_line_index);
+                    key_pressed_based_command_run = true;
                 }
             }
 
@@ -676,9 +723,11 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                             (current_search_index - 1 + search_results.size()) % search_results.size();
                         SubTextIndex sti = search_results[current_search_index];
                         viewport.set_active_buffer_line_col_under_cursor(sti.start_line, sti.start_col);
+
                     } else {
                         std::cout << "No search results found" << std::endl;
                     }
+                    key_pressed_based_command_run = true;
                 }
             } else {
                 if (jp(EKey::n)) {
@@ -691,6 +740,8 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                     } else {
                         std::cout << "No search results found" << std::endl;
                     }
+
+                    key_pressed_based_command_run = true;
                 }
             }
             if (input_state.is_pressed(EKey::LEFT_SHIFT)) {
@@ -699,6 +750,8 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                     command_bar_input = ":";
                     command_bar_input_signal.toggle_state();
                     mode_change_signal.toggle_state();
+
+                    key_pressed_based_command_run = true;
                 }
             }
             if (jp(EKey::SLASH)) {
@@ -706,6 +759,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                 command_bar_input = "/";
                 command_bar_input_signal.toggle_state();
                 mode_change_signal.toggle_state();
+                key_pressed_based_command_run = true;
             }
 
         } else if (current_mode == COMMAND) {
@@ -713,9 +767,15 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
             if (jp(EKey::ENTER)) {
                 if (command_bar_input == ":w") {
                     viewport.buffer.save_file();
+                    key_pressed_based_command_run = true;
                 }
                 if (command_bar_input == ":q") {
-                    glfwSetWindowShouldClose(window, true);
+                    glfwSetWindowShouldClose(window.glfw_window, true);
+                    key_pressed_based_command_run = true;
+                }
+                if (command_bar_input == ":tfs") {
+                    window.toggle_fullscreen();
+                    key_pressed_based_command_run = true;
                 }
                 if (command_bar_input.front() == '/') {
                     // Forward search command
@@ -746,6 +806,10 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                 current_mode = MOVE_AND_EDIT;
                 mode_change_signal.toggle_state();
             }
+        }
+
+        if (key_pressed_based_command_run) {
+            potential_regex_command = "";
         }
 
     } else {
@@ -805,6 +869,8 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
 
 int main(int argc, char *argv[]) {
 
+    PeriodicSignal one_second_signal_for_status_bar_time_update(2);
+
     bool configured_rcr = false;
 
     RegexCommandRunner rcr;
@@ -818,8 +884,9 @@ int main(int argc, char *argv[]) {
     std::vector<spdlog::sink_ptr> sinks = {console_sink, file_sink};
 
     bool start_in_fullscreen = false;
-    GLFWwindow *window = initialize_glfw_glad_and_return_window(SCREEN_WIDTH, SCREEN_HEIGHT, "glfw window",
-                                                                start_in_fullscreen, false, false);
+    Window window;
+    window.initialize_glfw_glad_and_return_window(SCREEN_WIDTH, SCREEN_HEIGHT, "glfw window", start_in_fullscreen,
+                                                  false, false);
 
     std::vector<int> doids_for_textboxes_for_active_directory_for_later_removal;
     TemporalBinarySignal search_results_changed_signal;
@@ -1062,11 +1129,6 @@ int main(int argc, char *argv[]) {
 
         if (action == GLFW_PRESS || action == GLFW_REPEAT) {
             switch (key) {
-                // this case switch is so BS, need to use the frag-z thing for handling keyboard input, take a look at
-                // that again.
-            case GLFW_KEY_I:
-
-                break;
             case GLFW_KEY_CAPS_LOCK:
                 current_mode = MOVE_AND_EDIT;
                 mode_change_signal.toggle_state();
@@ -1105,48 +1167,19 @@ int main(int argc, char *argv[]) {
                     }
                 }
                 break;
-            case GLFW_KEY_4:                 // $ key (Shift + 4)
-                if (mods & GLFW_MOD_SHIFT) { // Check if Shift is pressed
-                    if (current_mode == MOVE_AND_EDIT || current_mode == VISUAL_SELECT) {
-                        viewport.move_cursor_to_end_of_line();
-                    }
-                }
-                break;
-            case GLFW_KEY_0:
-                if (current_mode == MOVE_AND_EDIT || current_mode == VISUAL_SELECT) {
-                    viewport.move_cursor_to_start_of_line();
-                }
-                break;
-            case GLFW_KEY_M: // m key (no modifier)
-                if (current_mode == MOVE_AND_EDIT || current_mode == VISUAL_SELECT) {
-                    viewport.move_cursor_to_middle_of_line();
-                }
-                break;
             case GLFW_KEY_TAB:
                 if (current_mode == INSERT) {
                     viewport.insert_tab_at_cursor();
                 }
                 break;
             case GLFW_KEY_P:
-                if (current_mode == MOVE_AND_EDIT) {
-                    if (mods & GLFW_MOD_SHIFT) {
-                        // Shift is held down, insert content from the clipboard
-                        const char *clipboard_content = glfwGetClipboardString(window);
-                        if (clipboard_content) {
-                            viewport.insert_string_at_cursor(clipboard_content);
-                        }
-                    } else {
-                        // Insert the last deleted content
-                        viewport.insert_string_at_cursor(viewport.buffer.get_last_deleted_content());
-                    }
-                }
                 break;
             case GLFW_KEY_Y:
                 if (current_mode == VISUAL_SELECT) {
                     std::string curr_sel = viewport.buffer.get_bounding_box_string(
                         line_where_selection_mode_started, col_where_selection_mode_started,
                         viewport.active_buffer_line_under_cursor, viewport.active_buffer_col_under_cursor);
-                    glfwSetClipboardString(window, curr_sel.c_str());
+                    glfwSetClipboardString(window.glfw_window, curr_sel.c_str());
                 }
                 break;
             default:
@@ -1156,10 +1189,17 @@ int main(int argc, char *argv[]) {
     };
     std::function<void(double, double)> mouse_pos_callback = [](double _, double _1) {};
     std::function<void(int, int, int)> mouse_button_callback = [](int _, int _1, int _2) {};
-    GLFWLambdaCallbackManager glcm(window, char_callback, key_callback, mouse_pos_callback, mouse_button_callback);
+    GLFWLambdaCallbackManager glcm(window.glfw_window, char_callback, key_callback, mouse_pos_callback,
+                                   mouse_button_callback);
 
-    while (!glfwWindowShouldClose(window)) {
-        glfwGetFramebufferSize(window, &width, &height);
+    double last_time = 0.0;
+    double delta_time = 0.0;
+    while (!glfwWindowShouldClose(window.glfw_window)) {
+        double current_time = glfwGetTime();
+        delta_time = current_time - last_time;
+        last_time = current_time;
+
+        glfwGetFramebufferSize(window.glfw_window, &width, &height);
 
         glViewport(0, 0, width, height);
 
@@ -1168,7 +1208,7 @@ int main(int argc, char *argv[]) {
         render(viewport, screen_grid, status_bar_grid, command_bar_grid, command_bar_input, monospaced_font_atlas,
                batcher, mode_change_signal, command_bar_input_signal, center_idx_x, center_idx_y, num_cols, num_lines,
                col_where_selection_mode_started, line_where_selection_mode_started, current_mode, shader_cache,
-               mode_to_cursor_color);
+               mode_to_cursor_color, delta_time, one_second_signal_for_status_bar_time_update);
 
         // render UI stuff
 
@@ -1220,11 +1260,11 @@ int main(int argc, char *argv[]) {
                       potential_regex_command, configured_rcr, insert_mode_signal);
 
         TemporalBinarySignal::process_all();
-        glfwSwapBuffers(window);
+        glfwSwapBuffers(window.glfw_window);
         glfwPollEvents();
     }
 
-    glfwDestroyWindow(window);
+    glfwDestroyWindow(window.glfw_window);
 
     glfwTerminate();
     exit(EXIT_SUCCESS);
