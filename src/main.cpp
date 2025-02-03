@@ -402,6 +402,32 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                 mode_change_signal.toggle_state();
             }
         });
+        rcr.add_regex("^a", [&](const std::smatch &m) {
+            if (current_mode == MOVE_AND_EDIT) {
+                viewport.scroll_right();
+                current_mode = INSERT;
+                insert_mode_signal.toggle_state();
+                mode_change_signal.toggle_state();
+            }
+        });
+        rcr.add_regex("^A", [&](const std::smatch &m) {
+            if (current_mode == MOVE_AND_EDIT) {
+                viewport.move_cursor_to_end_of_line();
+                current_mode = INSERT;
+                insert_mode_signal.toggle_state();
+                mode_change_signal.toggle_state();
+            }
+        });
+        rcr.add_regex("^I", [&](const std::smatch &m) {
+            if (current_mode == MOVE_AND_EDIT) {
+                int ciofnwc = viewport.buffer.find_col_idx_of_first_non_whitespace_character_in_line(
+                    viewport.active_buffer_line_under_cursor);
+                viewport.set_active_buffer_col_under_cursor(ciofnwc);
+                current_mode = INSERT;
+                insert_mode_signal.toggle_state();
+                mode_change_signal.toggle_state();
+            }
+        });
         rcr.add_regex("j", [&](const std::smatch &m) {
             if (current_mode == MOVE_AND_EDIT)
                 viewport.scroll_down();
@@ -514,6 +540,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                                                     viewport.active_buffer_line_under_cursor, col_idx);
                 if (command == "c") {
                     current_mode = INSERT;
+                    insert_mode_signal.toggle_state();
                     mode_change_signal.toggle_state();
                 }
             }
@@ -555,8 +582,19 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
             viewport.set_active_buffer_line_col_under_cursor(viewport.active_buffer_line_under_cursor, left_match_col);
         });
 
-        rcr.add_regex("gg", [&](const std::smatch &m) { viewport.set_active_buffer_line_under_cursor(0); });
-        rcr.add_regex("o", [&](const std::smatch &m) { viewport.create_new_line_at_cursor_and_scroll_down(); });
+        rcr.add_regex("gg", [&](const std::smatch &m) {
+            if (current_mode == MOVE_AND_EDIT) {
+                viewport.set_active_buffer_line_under_cursor(0);
+            }
+        });
+        rcr.add_regex("o", [&](const std::smatch &m) {
+            if (current_mode == MOVE_AND_EDIT) {
+                viewport.create_new_line_at_cursor_and_scroll_down();
+                current_mode = INSERT;
+                insert_mode_signal.toggle_state();
+                mode_change_signal.toggle_state();
+            }
+        });
 
         rcr.add_regex("u", [&](const std::smatch &m) {
             if (current_mode == MOVE_AND_EDIT) {
@@ -568,7 +606,11 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                 viewport.buffer.redo();
             }
         });
-        rcr.add_regex(" sf", [&](const std::smatch &m) { fs_browser_is_active = true; });
+        rcr.add_regex(" sf", [&](const std::smatch &m) {
+            if (current_mode == MOVE_AND_EDIT) {
+                fs_browser_is_active = true;
+            }
+        });
         rcr.add_regex("dd", [&](const std::smatch &m) {
             if (current_mode == MOVE_AND_EDIT) {
                 viewport.delete_line_at_cursor();

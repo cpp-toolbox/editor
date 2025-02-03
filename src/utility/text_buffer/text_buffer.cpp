@@ -367,6 +367,17 @@ int LineTextBuffer::find_leftward_index_before(int line_index, int col_index, ch
     return col_index; // If not found, return the original col_index
 }
 
+int LineTextBuffer::find_col_idx_of_first_non_whitespace_character_in_line(int line_index) {
+    int col_index = 0;
+    if (line_index < lines.size()) {
+        const std::string &line = get_line(line_index);
+        while (col_index < line.size() && std::isspace(static_cast<unsigned char>(line[col_index]))) {
+            ++col_index;
+        }
+    }
+    return col_index;
+}
+
 // Updated function with direct line handling
 int LineTextBuffer::find_forward_by_word_index(int line_index, int col_index) {
     if (line_index < lines.size()) { // Ensure line_index is valid

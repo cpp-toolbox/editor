@@ -65,6 +65,8 @@ class LineTextBuffer {
     int find_rightward_index_before(int line_index, int col_index, char character);
     int find_leftward_index_before(int line_index, int col_index, char character);
 
+    int find_col_idx_of_first_non_whitespace_character_in_line(int line_index);
+
     int find_forward_by_word_index(int line_index, int col_index);
     int find_forward_to_end_of_word(int line_index, int col_index);
 

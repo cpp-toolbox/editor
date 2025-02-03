@@ -150,8 +150,8 @@ void Viewport::move_cursor_forward_until_next_right_bracket() {
     moved_signal.toggle_state();
 }
 void Viewport::move_cursor_backward_until_next_left_bracket() {
-    active_buffer_col_under_cursor =
-        buffer.find_column_index_of_previous_left_bracket(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
+    active_buffer_col_under_cursor = buffer.find_column_index_of_previous_left_bracket(active_buffer_line_under_cursor,
+                                                                                       active_buffer_col_under_cursor);
     moved_signal.toggle_state();
 }
 void Viewport::move_cursor_forward_by_word() {
@@ -254,7 +254,8 @@ bool Viewport::create_new_line_at_cursor_and_scroll_down() {
     }
 
     scroll_down();
-
+    // and move to the start of the line as well
+    set_active_buffer_col_under_cursor(0);
     // Optionally: Adjust any other properties related to the cursor or viewport
     // after inserting the new line, such as moving the cursor to the beginning of the new line.
 
