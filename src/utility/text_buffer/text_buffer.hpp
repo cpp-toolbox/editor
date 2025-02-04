@@ -30,10 +30,6 @@ class Diff {
 };
 
 class LineTextBuffer {
-  public:
-    TemporalBinarySignal edit_signal;
-    std::string current_file_path;
-    bool modified_without_save = false;
 
   private:
     std::vector<std::string> lines;
@@ -41,6 +37,10 @@ class LineTextBuffer {
     std::stack<Diff> redo_stack;
 
   public:
+    TemporalBinarySignal edit_signal;
+    std::string current_file_path;
+    bool modified_without_save = false;
+
     bool load_file(const std::string &file_path);
     bool save_file();
 
@@ -83,6 +83,8 @@ class LineTextBuffer {
     std::vector<SubTextIndex> find_backward_matches(int line_index, int col_index, const std::string &regex_str);
 
     std::string get_last_deleted_content() const;
+
+    int get_indentation_level(int line, int col);
 
     void undo();
     void redo();

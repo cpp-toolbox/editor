@@ -550,3 +550,28 @@ std::vector<SubTextIndex> LineTextBuffer::find_backward_matches(int line_index, 
     }
     return matches;
 }
+
+int LineTextBuffer::get_indentation_level(int line, int col) {
+    std::stack<char> bracket_stack; // Stack to keep track of open/close brackets
+    int indentation_level = 0;
+
+    // Iterate through all lines up to the specified line
+    for (int i = 0; i <= line; ++i) {
+        const std::string &current_line = lines[i];
+
+        // Check each character in the line up to the specified column (or end of line)
+        for (int j = 0; j < (i == line ? col : current_line.length()); ++j) {
+            if (current_line[j] == '{') {
+                bracket_stack.push('{'); // Push an open bracket to the stack
+                ++indentation_level;     // Increase indentation level for each open bracket
+            } else if (current_line[j] == '}') {
+                if (!bracket_stack.empty()) {
+                    bracket_stack.pop(); // Pop the stack for a matching closing bracket
+                    --indentation_level; // Decrease indentation level for each closing bracket
+                }
+            }
+        }
+    }
+
+    return indentation_level;
+}

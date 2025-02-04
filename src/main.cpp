@@ -435,11 +435,13 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
             }
         });
 
-        rcr.add_regex("v", [&](const std::smatch &m) {
-            current_mode = VISUAL_SELECT;
-            mode_change_signal.toggle_state();
-            line_where_selection_mode_started = viewport.active_buffer_line_under_cursor;
-            col_where_selection_mode_started = viewport.active_buffer_col_under_cursor;
+        rcr.add_regex("^v", [&](const std::smatch &m) {
+            if (current_mode == MOVE_AND_EDIT) {
+                current_mode = VISUAL_SELECT;
+                mode_change_signal.toggle_state();
+                line_where_selection_mode_started = viewport.active_buffer_line_under_cursor;
+                col_where_selection_mode_started = viewport.active_buffer_col_under_cursor;
+            }
         });
 
         rcr.add_regex("^i", [&](const std::smatch &m) {
@@ -677,6 +679,12 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                     viewport.create_new_line_at_cursor_and_scroll_down();
                 }
 
+                for (int i = 0; i < viewport.buffer.get_indentation_level(viewport.active_buffer_line_under_cursor,
+                                                                          viewport.active_buffer_col_under_cursor);
+                     i++) {
+                    viewport.insert_tab_at_cursor();
+                }
+
                 current_mode = INSERT;
                 insert_mode_signal.toggle_state();
                 mode_change_signal.toggle_state();
@@ -717,7 +725,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
     std::function<bool(EKey)> jp = [&](EKey k) { return input_state.is_just_pressed(k); };
     std::function<bool(EKey)> ip = [&](EKey k) { return input_state.is_pressed(k); };
     auto keys_just_pressed_this_tick = input_state.get_keys_just_pressed_this_tick();
-    if (not fs_browser_is_active) {
+    if (not fs_browser_is_active or current_mode != INSERT) {
 
         // NOTE: if keys just pressed this tick is has length greater or equal to 2, then that implies two keys were
         // pressed ina single tick, should be rare enough to ignore, but note that it may be a cause for later bugs.
@@ -922,6 +930,11 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
     if (current_mode == INSERT) {
         if (jp(EKey::ENTER)) {
             viewport.create_new_line_at_cursor_and_scroll_down();
+            for (int i = 0; i < viewport.buffer.get_indentation_level(viewport.active_buffer_line_under_cursor,
+                                                                      viewport.active_buffer_col_under_cursor);
+                 i++) {
+                viewport.insert_tab_at_cursor();
+            }
         }
     }
 }

@@ -241,7 +241,7 @@ bool Viewport::insert_tab_at_cursor() {
 
     // If insertion is successful, perform scrolling
     if (insert_result) {
-        scroll(0, 4); // Scroll down by 4 lines
+        scroll(0, 4); // scroll right by four
     }
 
     return insert_result; // Return the result of the insert operation
