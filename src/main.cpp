@@ -45,6 +45,9 @@
 #include <cstdio>
 
 Colors colors;
+int saved = 0;
+int SaveLastCol = 0;
+int SaveLastLine = 0;
 /**
  * Gets the directory of the executable.
  *
@@ -908,12 +911,37 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
     }
 }
 
+// code to make sure the cursor stays within the lines
+void snap_to_end_of_line_while_navigating(Viewport &viewport){
+
+    const std::string &line = viewport.buffer.get_line(viewport.active_buffer_line_under_cursor);
+
+    if(line.size() < SaveLastCol){
+        if(saved == 0){
+            SaveLastCol = viewport.active_buffer_col_under_cursor;
+            saved = 1;
+            viewport.set_active_buffer_line_col_under_cursor(viewport.active_buffer_line_under_cursor, line.size());
+        }
+    }
+    if(line.size() >= SaveLastCol){
+        if(saved == 1){viewport.set_active_buffer_line_col_under_cursor(viewport.active_buffer_line_under_cursor, SaveLastCol);}
+        SaveLastCol = viewport.active_buffer_col_under_cursor;
+        saved = 0;
+    }
+    if(SaveLastLine != viewport.active_buffer_line_under_cursor && saved == 1){
+        viewport.set_active_buffer_line_col_under_cursor(viewport.active_buffer_line_under_cursor, line.size());
+        SaveLastLine = viewport.active_buffer_line_under_cursor;
+    }
+    if(line.size() != viewport.active_buffer_col_under_cursor){
+        saved = 0;
+        SaveLastCol = viewport.active_buffer_col_under_cursor;
+    }
+
+}
+
 int main(int argc, char *argv[]) {
 
     PeriodicSignal one_second_signal_for_status_bar_time_update(2);
-    int saved = 0;
-    int SaveLastPosition = 0;
-    int SaveLastLine = 0;
     bool configured_rcr = false;
 
     RegexCommandRunner rcr;
@@ -1234,34 +1262,9 @@ int main(int argc, char *argv[]) {
                       searchable_files, fb, doids_for_textboxes_for_active_directory_for_later_removal, fs_browser,
                       search_results_changed_signal, selected_file_doid, currently_matched_files, rcr,
                       potential_regex_command, configured_rcr, insert_mode_signal);
+ 
+        snap_to_end_of_line_while_navigating(viewport);
 
-        const std::string &line = viewport.buffer.get_line(viewport.active_buffer_line_under_cursor);
-        //make sure the cursor stays within the line 
-        
-
-        //Here begins the logic to enure the cursor loops back on text when changing lines
-        //while storing the last position the cursor waas before it changed.
-        if(line.size() < SaveLastPosition){
-            if(saved == 0){
-                SaveLastPosition = viewport.active_buffer_col_under_cursor;
-                saved = 1;
-                viewport.set_active_buffer_line_col_under_cursor(viewport.active_buffer_line_under_cursor, line.size());
-            }
-        }
-        if(line.size() >= SaveLastPosition){
-            if(saved == 1){viewport.set_active_buffer_line_col_under_cursor(viewport.active_buffer_line_under_cursor, SaveLastPosition);}
-            SaveLastPosition = viewport.active_buffer_col_under_cursor;
-            saved = 0;
-        }
-        if(SaveLastLine != viewport.active_buffer_line_under_cursor && saved == 1){
-            viewport.set_active_buffer_line_col_under_cursor(viewport.active_buffer_line_under_cursor, line.size());
-            SaveLastLine = viewport.active_buffer_line_under_cursor;
-        }
-        if(line.size() != viewport.active_buffer_col_under_cursor){
-            saved = 0;
-            SaveLastPosition = viewport.active_buffer_col_under_cursor;
-        }
-        //End cursor loop-back logic
         TemporalBinarySignal::process_all();
         glfwSwapBuffers(window.glfw_window);
         glfwPollEvents();
