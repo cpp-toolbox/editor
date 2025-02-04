@@ -911,7 +911,9 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
 int main(int argc, char *argv[]) {
 
     PeriodicSignal one_second_signal_for_status_bar_time_update(2);
-
+    int saved = 0;
+    int SaveLastPosition = 0;
+    int SaveLastLine = 0;
     bool configured_rcr = false;
 
     RegexCommandRunner rcr;
@@ -1234,9 +1236,32 @@ int main(int argc, char *argv[]) {
                       potential_regex_command, configured_rcr, insert_mode_signal);
 
         const std::string &line = viewport.buffer.get_line(viewport.active_buffer_line_under_cursor);
+        //make sure the cursor stays within the line 
+        
 
-        //make sure the cursor stays within the line when scrolling 
-        if(line.size() < viewport.active_buffer_col_under_cursor){viewport.set_active_buffer_line_col_under_cursor(viewport.active_buffer_line_under_cursor, line.size());}
+        //Here begins the logic to enure the cursor loops back on text when changing lines
+        //while storing the last position the cursor waas before it changed.
+        if(line.size() < SaveLastPosition){
+            if(saved == 0){
+                SaveLastPosition = viewport.active_buffer_col_under_cursor;
+                saved = 1;
+                viewport.set_active_buffer_line_col_under_cursor(viewport.active_buffer_line_under_cursor, line.size());
+            }
+        }
+        if(line.size() >= SaveLastPosition){
+            if(saved == 1){viewport.set_active_buffer_line_col_under_cursor(viewport.active_buffer_line_under_cursor, SaveLastPosition);}
+            SaveLastPosition = viewport.active_buffer_col_under_cursor;
+            saved = 0;
+        }
+        if(SaveLastLine != viewport.active_buffer_line_under_cursor && saved == 1){
+            viewport.set_active_buffer_line_col_under_cursor(viewport.active_buffer_line_under_cursor, line.size());
+            SaveLastLine = viewport.active_buffer_line_under_cursor;
+        }
+        if(line.size() != viewport.active_buffer_col_under_cursor){
+            saved = 0;
+            SaveLastPosition = viewport.active_buffer_col_under_cursor;
+        }
+        //End cursor loop-back logic
         TemporalBinarySignal::process_all();
         glfwSwapBuffers(window.glfw_window);
         glfwPollEvents();
