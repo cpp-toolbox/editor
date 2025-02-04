@@ -294,33 +294,33 @@ void setup_sdf_shader_uniforms(ShaderCache &shader_cache) {
 
 template <typename Iterable>
 std::vector<std::pair<std::string, double>> find_matching_files(const std::string &query, const Iterable &files,
-                                                                size_t result_limit) {
-    // Initialize results vector
+                                                                size_t result_limit, double filename_weight = 0.7) {
     std::vector<std::pair<std::string, double>> results;
 
-    // Use CachedRatio for efficient repeated comparisons
     rapidfuzz::fuzz::CachedRatio<char> scorer(query);
-
-    // Debugging setup
     spdlog::debug("Starting file matching with query: '{}' and result limit: {}", query, result_limit);
 
     for (const auto &file : files) {
-        // Calculate similarity score
-        double score = scorer.similarity(file.string());
+        std::string file_path = file.string();
+        std::string filename = std::filesystem::path(file_path).filename().string();
 
-        // Log the file and score
-        spdlog::debug("File: '{}', Score: {:.2f}", file.string(), score);
+        // Calculate similarity scores for both the full path and the filename
+        double path_score = scorer.similarity(file_path);
+        double filename_score = scorer.similarity(filename);
 
-        // Add all files with their scores to the results
-        results.emplace_back(file.string(), score);
+        // Weighted combination of both scores
+        double combined_score = (1.0 - filename_weight) * path_score + filename_weight * filename_score;
+
+        spdlog::debug("File: '{}', Path Score: {:.2f}, Filename Score: {:.2f}, Combined Score: {:.2f}", file_path,
+                      path_score, filename_score, combined_score);
+
+        results.emplace_back(file_path, combined_score);
     }
 
-    // Sort results by similarity in descending order
     std::sort(results.begin(), results.end(), [](const auto &a, const auto &b) { return a.second > b.second; });
 
     spdlog::debug("Sorting completed. Total files evaluated: {}", results.size());
 
-    // Trim the results to the specified limit
     if (results.size() > result_limit) {
         results.resize(result_limit);
         spdlog::debug("Trimmed results to the top {} files.", result_limit);
@@ -391,7 +391,23 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                    TemporalBinarySignal &insert_mode_signal) {
 
     if (not configured_rcr) {
+        rcr.add_regex("^x", [&](const std::smatch &m) {
+            if (current_mode == MOVE_AND_EDIT) {
+                viewport.delete_character_at_active_position();
+            }
 
+            if (current_mode == VISUAL_SELECT) {
+                viewport.buffer.delete_bounding_box(line_where_selection_mode_started, col_where_selection_mode_started,
+                                                    viewport.active_buffer_line_under_cursor,
+                                                    viewport.active_buffer_col_under_cursor);
+
+                viewport.set_active_buffer_line_col_under_cursor(line_where_selection_mode_started,
+                                                                 col_where_selection_mode_started);
+
+                current_mode = MOVE_AND_EDIT;
+                mode_change_signal.toggle_state();
+            }
+        });
         rcr.add_regex("^m", [&](const std::smatch &m) {
             if (current_mode == MOVE_AND_EDIT || current_mode == VISUAL_SELECT) {
                 viewport.move_cursor_to_middle_of_line();
@@ -839,10 +855,27 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
             if (currently_matched_files.size() != 0) {
                 std::cout << "about to load up: " << currently_matched_files[0] << std::endl;
                 std::string file_to_open = currently_matched_files[0];
-                LineTextBuffer ltb;
-                ltb.load_file(file_to_open);
-                viewport.buffer = ltb;
-                fs_browser_is_active = false;
+                std::cout << "file_to_open: " << file_to_open << std::endl;
+
+                bool found_active_file_buffer = false;
+                for (auto &active_file_buffer : viewport.active_file_buffers) {
+                    std::cout << active_file_buffer.current_file_path << std::endl;
+                    if (active_file_buffer.current_file_path == file_to_open) {
+                        std::cout << "found matching buffer, using it " << std::endl;
+                        viewport.switch_buffers(active_file_buffer);
+                        found_active_file_buffer = true;
+                        fs_browser_is_active = false;
+                        fs_browser_search_query = "";
+                    }
+                }
+                if (not found_active_file_buffer) {
+                    std::cout << "didn't find matching buffer creating new buffer" << std::endl;
+                    LineTextBuffer ltb;
+                    ltb.load_file(file_to_open);
+                    viewport.switch_buffers(ltb);
+                    fs_browser_is_active = false;
+                    fs_browser_search_query = "";
+                }
                 return;
             }
         }
@@ -1006,12 +1039,10 @@ int main(int argc, char *argv[]) {
 
     std::string filename = argv[1]; // Get the file name from the first argument
 
-    std::vector<LineTextBuffer> active_file_buffers;
     LineTextBuffer file_buffer;
-    active_file_buffers.push_back(file_buffer);
-
     LineTextBuffer file_info;
     LineTextBuffer command_line;
+
     if (!file_buffer.load_file(filename)) {
         return 1; // Return an error code if the file couldn't be loaded
     }
@@ -1061,13 +1092,6 @@ int main(int argc, char *argv[]) {
             bool is_pressed = (action == GLFW_PRESS);
             active_key.pressed_signal.set_signal(is_pressed);
 
-            /*if (mods & GLFW_MOD_SHIFT) {*/
-            /*    if (active_key.shiftable) {*/
-            /*        active_key = *input_state.key_enum_to_object.at(active_key.key_enum_of_shifted_version);*/
-            /*    }*/
-            /*} else {*/
-            /*}*/
-
             Key &enum_grabbed_key = *input_state.key_enum_to_object.at(active_key.key_enum);
 
             if (current_mode == MOVE_AND_EDIT && command_bar_input == ":") {
@@ -1089,43 +1113,6 @@ int main(int argc, char *argv[]) {
                             command_bar_input = "Ain't no more history!";
                             command_bar_input_signal.toggle_state();
                         }
-
-                        // maybe this can be generalized to unary, binary etc type commands
-                        std::vector<std::string> potential_automatic_command_prefixes = {"d", "c", "y", "f", "F", "t",
-                                                                                         "T",
-                                                                                         // temp adding theses
-                                                                                         "r", "e", "w"};
-
-                        bool command_started_or_continuing =
-                            starts_with_any_prefix(key_str, potential_automatic_command_prefixes);
-
-                        bool control_not_pressed =
-                            input_state.key_enum_to_object.at(EKey::LEFT_CONTROL)->pressed_signal.is_off();
-                        //
-                        /*if (key_str != "escape") {*/
-                        /*    if (command_started_or_continuing and control_not_pressed) {*/
-                        /*        potential_automatic_command += key_str;*/
-                        /*        std::cout << "command: " << potential_automatic_command << std::endl;*/
-                        /*        std::cout << "----------" << std::endl;*/
-                        /**/
-                        /*        command_bar_input = potential_automatic_command;*/
-                        /*        command_bar_input_signal.toggle_state();*/
-                        /**/
-                        /*        if (potential_automatic_command.length() > 3) {*/
-                        /*            potential_automatic_command = potential_automatic_command.substr(1);*/
-                        /*        }*/
-                        /*    }*/
-                        /*}*/
-                        /*bool command_was_run = move_and_edit_arcr.potentially_run_normal_mode_command(*/
-                        /*    potential_automatic_command, viewport, current_mode, mode_change_signal, window,*/
-                        /*    fs_browser_is_active);*/
-                        /*if (command_was_run | key_str == "escape") {*/
-                        /*    potential_automatic_command = "";*/
-                        /*    command_bar_input = "";*/
-                        /*    command_bar_input_signal.toggle_state();*/
-                        /*    std::cout << "command ended: " << potential_automatic_command << std::endl;*/
-                        /*    std::cout << "----------" << std::endl;*/
-                        /*}*/
                     }
                     if (active_key.key_enum == EKey::ESCAPE or active_key.key_enum == EKey::CAPS_LOCK) {
                         potential_automatic_command = "";
@@ -1139,23 +1126,6 @@ int main(int argc, char *argv[]) {
             case GLFW_KEY_CAPS_LOCK:
                 current_mode = MOVE_AND_EDIT;
                 mode_change_signal.toggle_state();
-                break;
-            case GLFW_KEY_X:
-                if (current_mode == MOVE_AND_EDIT) {
-                    viewport.delete_character_at_active_position();
-                }
-
-                if (current_mode == VISUAL_SELECT) {
-                    viewport.buffer.delete_bounding_box(
-                        line_where_selection_mode_started, col_where_selection_mode_started,
-                        viewport.active_buffer_line_under_cursor, viewport.active_buffer_col_under_cursor);
-
-                    viewport.set_active_buffer_line_col_under_cursor(line_where_selection_mode_started,
-                                                                     col_where_selection_mode_started);
-
-                    current_mode = MOVE_AND_EDIT;
-                    mode_change_signal.toggle_state();
-                }
                 break;
             case GLFW_KEY_BACKSPACE:
                 if (fs_browser_is_active) {
@@ -1178,8 +1148,6 @@ int main(int argc, char *argv[]) {
                 if (current_mode == INSERT) {
                     viewport.insert_tab_at_cursor();
                 }
-                break;
-            case GLFW_KEY_P:
                 break;
             case GLFW_KEY_Y:
                 if (current_mode == VISUAL_SELECT) {

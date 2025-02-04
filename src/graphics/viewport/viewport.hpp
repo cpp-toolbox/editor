@@ -2,6 +2,7 @@
 #define VIEWPORT_HPP
 
 #include "../../utility/text_buffer/text_buffer.hpp"
+#include <unordered_map>
 #include <vector>
 
 class Viewport {
@@ -13,7 +14,13 @@ class Viewport {
      * @param cursor_col_offset The initial cursor column offset.
      */
 
-    Viewport(LineTextBuffer &buffer, int num_lines, int num_cols, int cursor_line_offset, int cursor_col_offset);
+    Viewport(LineTextBuffer &initial_buffer, int num_lines, int num_cols, int cursor_line_offset,
+             int cursor_col_offset);
+
+    std::vector<LineTextBuffer> active_file_buffers;
+
+    std::unordered_map<std::string, std::tuple<int, int>> file_name_to_last_viewport_position;
+    void switch_buffers(LineTextBuffer &ltb);
 
     void scroll(int delta_row, int delta_col);
     void scroll_up();

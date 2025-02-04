@@ -2,13 +2,43 @@
 
 #include <cctype> // For std::isalnum
 
-Viewport::Viewport(LineTextBuffer &buffer, int num_lines, int num_cols, int cursor_line_offset, int cursor_col_offset)
-    : buffer(buffer), cursor_line_offset(cursor_line_offset), num_lines(num_lines), num_cols(num_cols),
+Viewport::Viewport(LineTextBuffer &initial_buffer, int num_lines, int num_cols, int cursor_line_offset,
+                   int cursor_col_offset)
+    : buffer(initial_buffer), cursor_line_offset(cursor_line_offset), num_lines(num_lines), num_cols(num_cols),
       cursor_col_offset(cursor_col_offset), active_buffer_line_under_cursor(0), active_buffer_col_under_cursor(0),
       selection_mode_on(false) {
 
     // Initialize the previous_state with the same dimensions as the viewport
     previous_state.resize(num_lines, std::vector<char>(num_cols, ' '));
+    active_file_buffers.push_back(initial_buffer);
+}
+
+void Viewport::switch_buffers(LineTextBuffer &ltb) {
+    // Save the current active position before switching
+    if (!buffer.current_file_path.empty()) {
+        file_name_to_last_viewport_position[buffer.current_file_path] =
+            std::make_tuple(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
+    }
+
+    // Switch to the new buffer
+    buffer = ltb;
+
+    // Add the buffer to active_file_buffers if it's not already present
+    auto it_buffer = std::find_if(active_file_buffers.begin(), active_file_buffers.end(), [&](const LineTextBuffer &b) {
+        return b.current_file_path == ltb.current_file_path;
+    });
+    if (it_buffer == active_file_buffers.end()) {
+        active_file_buffers.push_back(ltb);
+    }
+
+    // Restore the last cursor position if available
+    auto it = file_name_to_last_viewport_position.find(ltb.current_file_path);
+    if (it != file_name_to_last_viewport_position.end()) {
+        auto [line, col] = it->second; // Structured binding
+        set_active_buffer_line_col_under_cursor(line, col);
+    } else {
+        set_active_buffer_line_col_under_cursor(0, 0);
+    }
 }
 
 void Viewport::tick() {
