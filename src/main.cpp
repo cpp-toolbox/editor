@@ -29,6 +29,7 @@
 #include "utility/input_state/input_state.hpp"
 #include "utility/regex_command_runner/regex_command_runner.hpp"
 #include "utility/periodic_signal/periodic_signal.hpp"
+#include "utility/config_file_parser/config_file_parser.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -45,9 +46,6 @@
 #include <cstdio>
 
 Colors colors;
-int saved = 0;
-int SaveLastCol = 0;
-int SaveLastLine = 0;
 /**
  * Gets the directory of the executable.
  *
@@ -99,9 +97,6 @@ enum EditorMode {
     VISUAL_SELECT,
     COMMAND,
 };
-
-unsigned int SCREEN_WIDTH = 700;
-unsigned int SCREEN_HEIGHT = 700;
 
 void adjust_uv_coordinates_in_place(std::vector<glm::vec2> &uv_coords, float horizontal_push, float top_push,
                                     float bottom_push) {
@@ -480,8 +475,14 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                 mode_change_signal.toggle_state();
             }
         });
+        rcr.add_regex("^\\^", [&](const std::smatch &m) {
+            if (current_mode == MOVE_AND_EDIT) {
+                int ciofnwc = viewport.buffer.find_col_idx_of_first_non_whitespace_character_in_line(
+                    viewport.active_buffer_line_under_cursor);
+                viewport.set_active_buffer_col_under_cursor(ciofnwc);
+            }
+        });
         rcr.add_regex(R"(^(\d*)([jklh]))", [&](const std::smatch &m) {
-
             if (current_mode == MOVE_AND_EDIT or current_mode == VISUAL_SELECT) {
                 int count = m[1].str().empty() ? 1 : std::stoi(m[1].str());
                 char direction = m[2].str()[0];
@@ -489,17 +490,33 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                 int line_delta = 0, col_delta = 0;
                 switch (direction) {
                 case 'j':
-                    if(viewport.buffer.line_count() > viewport.active_buffer_line_under_cursor + 1){line_delta = count;}
+                    if (viewport.buffer.line_count() > viewport.active_buffer_line_under_cursor + 1) {
+                        line_delta = count;
+                    }
                     break; // Scroll down
                 case 'k':
-                    if(viewport.active_buffer_line_under_cursor > 0){line_delta = -count;}
+                    if (viewport.active_buffer_line_under_cursor > 0) {
+                        line_delta = -count;
+                    }
                     break; // Scroll up
                 case 'h':
-                    if(viewport.active_buffer_col_under_cursor > 0){col_delta = -count;}
+                    if (viewport.active_buffer_col_under_cursor > 0) {
+                        col_delta = -count;
+                    }
                     break; // Scroll left
                 case 'l':
                     const std::string &line = viewport.buffer.get_line(viewport.active_buffer_line_under_cursor);
-                    if(line.size() > viewport.active_buffer_col_under_cursor){col_delta = count;}
+
+                    // TODO: this is bad because it stops me from being able to scroll rightware
+                    // if I want to on a blank line which is a real use case because sometimes
+                    // I want to be able to scroll right without caring about where I am in the file
+                    // note that this behavior is different than vim and thats ok
+                    /*if (line.size() > viewport.active_buffer_col_under_cursor) {*/
+                    /*    col_delta = count;*/
+                    /*}*/
+
+                    col_delta = count;
+
                     break; // Scroll right
                 }
 
@@ -584,7 +601,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                 // word
                 col_idx = viewport.buffer.find_forward_by_word_index(viewport.active_buffer_line_under_cursor,
                                                                      viewport.active_buffer_col_under_cursor) -
-                          1; 
+                          1;
             } else if (motion == "e") {
                 col_idx = viewport.buffer.find_forward_to_end_of_word(viewport.active_buffer_line_under_cursor,
                                                                       viewport.active_buffer_col_under_cursor);
@@ -906,40 +923,120 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
         if (jp(EKey::ENTER)) {
             viewport.create_new_line_at_cursor_and_scroll_down();
         }
-    } else if (current_mode == VISUAL_SELECT) {
-        shared_m_and_e_and_visual_selection_logic();
     }
 }
 
 // code to make sure the cursor stays within the lines
-void snap_to_end_of_line_while_navigating(Viewport &viewport){
+void snap_to_end_of_line_while_navigating(Viewport &viewport, int &saved, int &saved_last_col, int &saved_last_line) {
 
     const std::string &line = viewport.buffer.get_line(viewport.active_buffer_line_under_cursor);
 
-    if(line.size() < SaveLastCol){
-        if(saved == 0){
-            SaveLastCol = viewport.active_buffer_col_under_cursor;
+    if (line.size() < saved_last_col) {
+        if (saved == 0) {
+            saved_last_col = viewport.active_buffer_col_under_cursor;
             saved = 1;
             viewport.set_active_buffer_line_col_under_cursor(viewport.active_buffer_line_under_cursor, line.size());
         }
     }
-    if(line.size() >= SaveLastCol){
-        if(saved == 1){viewport.set_active_buffer_line_col_under_cursor(viewport.active_buffer_line_under_cursor, SaveLastCol);}
-        SaveLastCol = viewport.active_buffer_col_under_cursor;
+    if (line.size() >= saved_last_col) {
+        if (saved == 1) {
+            viewport.set_active_buffer_line_col_under_cursor(viewport.active_buffer_line_under_cursor, saved_last_col);
+        }
+        saved_last_col = viewport.active_buffer_col_under_cursor;
         saved = 0;
-    }
-    if(SaveLastLine != viewport.active_buffer_line_under_cursor && saved == 1){
-        viewport.set_active_buffer_line_col_under_cursor(viewport.active_buffer_line_under_cursor, line.size());
-        SaveLastLine = viewport.active_buffer_line_under_cursor;
-    }
-    if(line.size() != viewport.active_buffer_col_under_cursor){
-        saved = 0;
-        SaveLastCol = viewport.active_buffer_col_under_cursor;
     }
 
+    if (saved_last_line != viewport.active_buffer_line_under_cursor && saved == 1) {
+        viewport.set_active_buffer_line_col_under_cursor(viewport.active_buffer_line_under_cursor, line.size());
+        saved_last_line = viewport.active_buffer_line_under_cursor;
+    }
+
+    if (line.size() != viewport.active_buffer_col_under_cursor) {
+        saved = 0;
+        saved_last_col = viewport.active_buffer_col_under_cursor;
+    }
+}
+
+bool is_integer(const std::string &str) {
+    // create a stringstream from the input string
+    std::stringstream ss(str);
+    // declare a temporary integer variable to hold the value
+    int temp;
+    // try to extract an integer from the stringstream and ensure the whole string was processed
+    return (ss >> temp && ss.eof());
 }
 
 int main(int argc, char *argv[]) {
+
+    int saved_for_automatic_column_adjustment = 0;
+    int saved_last_col_for_automatic_column_adjustment = 0;
+    int saved_last_line_for_automatic_column_adjustment = 0;
+
+    unsigned int windowed_screen_width_px = 700;
+    unsigned int windowed_screen_height_px = 700;
+
+    bool automatic_column_adjustment = false;
+    std::string username = "tbx_user";
+
+    // numbers must be odd to have a center
+    int num_lines = 41;
+    int num_cols = 101;
+
+    bool start_in_fullscreen = false;
+
+    Configuration::SectionKeyPairToConfigLogic section_key_to_config_logic = {
+        {{"graphics", "start_in_fullscreen"},
+         [&](const std::string &value) {
+             if (value == "true") {
+                 start_in_fullscreen = true;
+             }
+         }},
+        {{"graphics", "windowed_screen_width_px"},
+         [&](const std::string &value) {
+             if (is_integer(value)) {
+                 windowed_screen_width_px = std::stoi(value);
+                 std::cout << "set width to " << value << std::endl;
+             } else {
+                 std::cout << "Error: 'windowed_screen_width_px ' is not a valid integer: " << value << std::endl;
+             }
+         }},
+        {{"graphics", "windowed_screen_height_px"},
+         [&](const std::string &value) {
+             if (is_integer(value)) {
+                 windowed_screen_height_px = std::stoi(value);
+             } else {
+                 std::cout << "Error: 'windowed_screen_height_px ' is not a valid integer: " << value << std::endl;
+             }
+         }},
+        {{"viewport", "automatic_column_adjustment"},
+         [&](const std::string &value) {
+             if (value == "true") {
+                 automatic_column_adjustment = true;
+             }
+         }},
+        {{"viewport", "num_lines"},
+         [&](const std::string &value) {
+             if (is_integer(value)) {
+                 num_lines = std::stoi(value);
+             } else {
+                 std::cout << "Error: 'num_lines' is not a valid integer: " << value << std::endl;
+             }
+         }},
+        {{"viewport", "num_cols"},
+         [&](const std::string &value) {
+             if (is_integer(value)) {
+                 num_cols = std::stoi(value);
+             } else {
+                 std::cout << "Error: 'num_cols' is not a valid integer: " << value << std::endl;
+             }
+         }},
+        {{"user", "name"}, [&](const std::string &value) { username = value; }},
+    };
+
+    std::filesystem::path config_path = "~/.tbx_cfg.ini";
+    Configuration config(config_path, section_key_to_config_logic);
+
+    std::cout << username << std::endl;
 
     PeriodicSignal one_second_signal_for_status_bar_time_update(2);
     bool configured_rcr = false;
@@ -954,10 +1051,9 @@ int main(int argc, char *argv[]) {
     file_sink->set_level(spdlog::level::info);
     std::vector<spdlog::sink_ptr> sinks = {console_sink, file_sink};
 
-    bool start_in_fullscreen = false;
     Window window;
-    window.initialize_glfw_glad_and_return_window(SCREEN_WIDTH, SCREEN_HEIGHT, "glfw window", start_in_fullscreen,
-                                                  false, false);
+    window.initialize_glfw_glad_and_return_window(windowed_screen_width_px, windowed_screen_height_px, "glfw window",
+                                                  start_in_fullscreen, false, false);
 
     std::vector<int> doids_for_textboxes_for_active_directory_for_later_removal;
     TemporalBinarySignal search_results_changed_signal;
@@ -977,8 +1073,8 @@ int main(int argc, char *argv[]) {
         std::filesystem::path("assets") / "fonts" / "times_64_sdf_atlas_font_info.json";
     std::filesystem::path font_json_path = std::filesystem::path("assets") / "fonts" / "times_64_sdf_atlas.json";
     std::filesystem::path font_image_path = std::filesystem::path("assets") / "fonts" / "times_64_sdf_atlas.png";
-    FontAtlas font_atlas(font_info_path.string(), font_json_path.string(), font_image_path.string(), SCREEN_WIDTH,
-                         false, true);
+    FontAtlas font_atlas(font_info_path.string(), font_json_path.string(), font_image_path.string(),
+                         windowed_screen_width_px, false, true);
 
     bool fs_browser_is_active = false;
     std::string fs_browser_search_query = "";
@@ -1019,10 +1115,6 @@ int main(int argc, char *argv[]) {
     int width, height;
 
     TextureAtlas monospaced_font_atlas("assets/font/font.json", "assets/font/font.png");
-
-    // numbers must be odd to have a center
-    int num_lines = 41;
-    int num_cols = 101;
 
     int line_where_selection_mode_started = -1;
     int col_where_selection_mode_started = -1;
@@ -1262,9 +1354,12 @@ int main(int argc, char *argv[]) {
                       searchable_files, fb, doids_for_textboxes_for_active_directory_for_later_removal, fs_browser,
                       search_results_changed_signal, selected_file_doid, currently_matched_files, rcr,
                       potential_regex_command, configured_rcr, insert_mode_signal);
- 
-        snap_to_end_of_line_while_navigating(viewport);
 
+        if (automatic_column_adjustment) {
+            snap_to_end_of_line_while_navigating(viewport, saved_for_automatic_column_adjustment,
+                                                 saved_last_col_for_automatic_column_adjustment,
+                                                 saved_last_line_for_automatic_column_adjustment);
+        }
         TemporalBinarySignal::process_all();
         glfwSwapBuffers(window.glfw_window);
         glfwPollEvents();

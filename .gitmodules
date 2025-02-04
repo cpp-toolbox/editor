@@ -67,3 +67,6 @@
 [submodule "src/utility/periodic_signal"]
 	path = src/utility/periodic_signal
 	url = git@github.com:cpp-toolbox/periodic_signal.git
+[submodule "src/utility/config_file_parser"]
+	path = src/utility/config_file_parser
+	url = git@github.com:cpp-toolbox/config_file_parser.git
