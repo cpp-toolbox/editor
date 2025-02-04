@@ -45,7 +45,6 @@
 #include <cstdio>
 
 Colors colors;
-
 /**
  * Gets the directory of the executable.
  *
@@ -479,6 +478,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
             }
         });
         rcr.add_regex(R"(^(\d*)([jklh]))", [&](const std::smatch &m) {
+
             if (current_mode == MOVE_AND_EDIT or current_mode == VISUAL_SELECT) {
                 int count = m[1].str().empty() ? 1 : std::stoi(m[1].str());
                 char direction = m[2].str()[0];
@@ -486,20 +486,21 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                 int line_delta = 0, col_delta = 0;
                 switch (direction) {
                 case 'j':
-                    line_delta = count;
+                    if(viewport.buffer.line_count() > viewport.active_buffer_line_under_cursor + 1){line_delta = count;}
                     break; // Scroll down
                 case 'k':
-                    line_delta = -count;
+                    if(viewport.active_buffer_line_under_cursor > 0){line_delta = -count;}
                     break; // Scroll up
                 case 'h':
-                    col_delta = -count;
+                    if(viewport.active_buffer_col_under_cursor > 0){col_delta = -count;}
                     break; // Scroll left
                 case 'l':
-                    col_delta = count;
+                    const std::string &line = viewport.buffer.get_line(viewport.active_buffer_line_under_cursor);
+                    if(line.size() > viewport.active_buffer_col_under_cursor){col_delta = count;}
                     break; // Scroll right
                 }
 
-                std::cout << line_delta << col_delta << std::endl;
+                std::cout << "line delta: " << line_delta << ", col delta: " << col_delta << std::endl;
                 viewport.scroll(line_delta, col_delta);
             }
         });
@@ -580,7 +581,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                 // word
                 col_idx = viewport.buffer.find_forward_by_word_index(viewport.active_buffer_line_under_cursor,
                                                                      viewport.active_buffer_col_under_cursor) -
-                          1;
+                          1; 
             } else if (motion == "e") {
                 col_idx = viewport.buffer.find_forward_to_end_of_word(viewport.active_buffer_line_under_cursor,
                                                                       viewport.active_buffer_col_under_cursor);
@@ -940,7 +941,6 @@ int main(int argc, char *argv[]) {
 
     ShaderCache shader_cache(requested_shaders, sinks);
     Batcher batcher(shader_cache);
-
     setup_sdf_shader_uniforms(shader_cache);
 
     std::filesystem::path font_info_path =
@@ -996,7 +996,6 @@ int main(int argc, char *argv[]) {
 
     int line_where_selection_mode_started = -1;
     int col_where_selection_mode_started = -1;
-
     float status_bar_top_pos = -0.90;
     float command_bar_top_pos = -0.95;
     float top_line_pos = 1;
@@ -1234,6 +1233,10 @@ int main(int argc, char *argv[]) {
                       search_results_changed_signal, selected_file_doid, currently_matched_files, rcr,
                       potential_regex_command, configured_rcr, insert_mode_signal);
 
+        const std::string &line = viewport.buffer.get_line(viewport.active_buffer_line_under_cursor);
+
+        //make sure the cursor stays within the line when scrolling 
+        if(line.size() < viewport.active_buffer_col_under_cursor){viewport.set_active_buffer_line_col_under_cursor(viewport.active_buffer_line_under_cursor, line.size());}
         TemporalBinarySignal::process_all();
         glfwSwapBuffers(window.glfw_window);
         glfwPollEvents();
