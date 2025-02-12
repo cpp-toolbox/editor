@@ -2,6 +2,7 @@
 #define VIEWPORT_HPP
 
 #include "../../utility/text_buffer/text_buffer.hpp"
+#include "../../utility/hierarchical_history/hierarchical_history.hpp"
 #include <unordered_map>
 #include <vector>
 
@@ -17,10 +18,14 @@ class Viewport {
     Viewport(LineTextBuffer &initial_buffer, int num_lines, int num_cols, int cursor_line_offset,
              int cursor_col_offset);
 
+    // TODO: this should not exist within the context of a viewport
+    // instead it should be with a "ModalEditor" class
     std::vector<LineTextBuffer> active_file_buffers;
 
+    HierarchicalHistory history;
+
     std::unordered_map<std::string, std::tuple<int, int>> file_name_to_last_viewport_position;
-    void switch_buffers(LineTextBuffer &ltb);
+    void switch_buffers_and_adjust_viewport_position(LineTextBuffer &ltb, bool store_movement_to_history = true);
 
     void scroll(int delta_row, int delta_col);
     void scroll_up();
@@ -29,7 +34,6 @@ class Viewport {
     void scroll_right();
 
     char get_symbol_at(int line, int col) const;
-    void move_cursor_to(int line, int col);
     void move_cursor_forward_until_end_of_word();
     void move_cursor_forward_until_next_right_bracket();
     void move_cursor_backward_until_next_left_bracket();
@@ -51,9 +55,9 @@ class Viewport {
     bool delete_character_at_active_position();
     bool backspace_at_active_position();
 
-    void set_active_buffer_line_col_under_cursor(int line, int col);
-    void set_active_buffer_line_under_cursor(int line);
-    void set_active_buffer_col_under_cursor(int col);
+    void set_active_buffer_line_col_under_cursor(int line, int col, bool store_pos_to_history = true);
+    void set_active_buffer_line_under_cursor(int line, bool store_pos_to_history = true);
+    void set_active_buffer_col_under_cursor(int col, bool store_pos_to_history = true);
 
     /**
      * @brief Updates the viewport and checks if any cell has changed since the last tick.
@@ -75,7 +79,7 @@ class Viewport {
     int cursor_line_offset;
     int cursor_col_offset;
 
-    std::vector<std::vector<char>> previous_state; ///< Stores the previous state of the viewport.
+    std::vector<std::vector<char>> previous_viewport_screen; ///< Stores the previous state of the viewport.
 
     void update_previous_state();
 };

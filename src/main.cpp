@@ -11,6 +11,8 @@
 #include <nlohmann/detail/input/input_adapters.hpp>
 #include <rapidfuzz/fuzz.hpp>
 
+#include "modal_editor/modal_editor.hpp"
+
 #include "graphics/ui/ui.hpp"
 #include "graphics/window/window.hpp"
 #include "graphics/shader_cache/shader_cache.hpp"
@@ -30,6 +32,7 @@
 #include "utility/regex_command_runner/regex_command_runner.hpp"
 #include "utility/periodic_signal/periodic_signal.hpp"
 #include "utility/config_file_parser/config_file_parser.hpp"
+#include "utility/lsp_client/lsp_client.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -375,6 +378,26 @@ void update_search_results(std::string &fs_browser_search_query, std::vector<std
     }
 }
 
+void switch_files(Viewport &viewport, LSPClient &lsp_client, const std::string &file_to_open,
+                  bool store_movements_to_history) {
+    bool found_active_file_buffer = false;
+    for (auto &active_file_buffer : viewport.active_file_buffers) {
+        std::cout << active_file_buffer.current_file_path << std::endl;
+        if (active_file_buffer.current_file_path == file_to_open) {
+            std::cout << "found matching buffer, using it " << std::endl;
+            viewport.switch_buffers_and_adjust_viewport_position(active_file_buffer, store_movements_to_history);
+            found_active_file_buffer = true;
+        }
+    }
+    if (not found_active_file_buffer) {
+        std::cout << "didn't find matching buffer creating new buffer" << std::endl;
+        LineTextBuffer ltb;
+        ltb.load_file(file_to_open);
+        lsp_client.did_open(file_to_open);
+        viewport.switch_buffers_and_adjust_viewport_position(ltb, store_movements_to_history);
+    }
+}
+
 void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBinarySignal &mode_change_signal,
                    Viewport &viewport, int &line_where_selection_mode_started, int &col_where_selection_mode_started,
                    std::vector<SubTextIndex> &search_results, int &current_search_index, std::string &command_bar_input,
@@ -384,8 +407,12 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                    std::vector<int> &doids_for_textboxes_for_active_directory_for_later_removal, UI &fs_browser,
                    TemporalBinarySignal &search_results_changed_signal, int &selected_file_doid,
                    std::vector<std::string> &currently_matched_files, RegexCommandRunner &rcr,
-                   std::string &potential_regex_command, bool &configured_rcr,
-                   TemporalBinarySignal &insert_mode_signal) {
+                   std::string &potential_regex_command, bool &configured_rcr, TemporalBinarySignal &insert_mode_signal,
+                   LSPClient &lsp_client, ModalEditor &modal_editor) {
+
+    // less keystrokes please:
+    std::function<bool(EKey)> jp = [&](EKey k) { return input_state.is_just_pressed(k); };
+    std::function<bool(EKey)> ip = [&](EKey k) { return input_state.is_pressed(k); };
 
     if (not configured_rcr) {
         rcr.add_regex("^x", [&](const std::smatch &m) {
@@ -445,7 +472,8 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
         });
 
         rcr.add_regex("^i", [&](const std::smatch &m) {
-            if (current_mode == MOVE_AND_EDIT) {
+            // left control pressed then don't do this because of ctrl-i command
+            if (not ip(EKey::LEFT_CONTROL) and current_mode == MOVE_AND_EDIT) {
                 current_mode = INSERT;
                 insert_mode_signal.toggle_state();
                 mode_change_signal.toggle_state();
@@ -526,7 +554,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                 viewport.scroll(line_delta, col_delta);
             }
         });
-        rcr.add_regex(R"((\d*)G)", [&](const std::smatch &m) {
+        rcr.add_regex(R"(^(\d*)G)", [&](const std::smatch &m) {
             std::string digits = m[1].str();
 
             if (digits.empty()) {
@@ -537,7 +565,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                 viewport.set_active_buffer_line_under_cursor(number - 1);
             }
         });
-        rcr.add_regex(R"(([cd]?)([fFtT])(.))", [&](const std::smatch &m) {
+        rcr.add_regex(R"(^([cd]?)([fFtT])(.))", [&](const std::smatch &m) {
             std::string action = m[1].str(); // 'c' (change) or 'd' (delete), optional
             std::string motion = m[2].str(); // 'f', 'F', 't', or 'T'
             char character = m[3].str()[0];  // The character to search for
@@ -628,7 +656,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
             }
         });
         // modification within brackets
-        rcr.add_regex(R"(([cd])([ai])([bB]))", [&](const std::smatch &m) {
+        rcr.add_regex(R"(^([cd])([ai])([bB]))", [&](const std::smatch &m) {
             std::string command = m[1].str();
             std::string inside_or_around = m[2].str();
             std::string bracket_type = m[3].str();
@@ -670,7 +698,8 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
             }
         });
         rcr.add_regex("^[oO]", [&](const std::smatch &m) {
-            if (current_mode == MOVE_AND_EDIT) {
+            // left control pressed then don't do this because of ctrl-o command
+            if (not ip(EKey::LEFT_CONTROL) and current_mode == MOVE_AND_EDIT) {
                 if (m.str() == "O") {
                     // Create a new line above the cursor and scroll up
                     viewport.create_new_line_above_cursor_and_scroll_up();
@@ -706,6 +735,45 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                 fs_browser_is_active = true;
             }
         });
+        rcr.add_regex("^ gd", [&](const std::smatch &m) {
+            if (current_mode == MOVE_AND_EDIT) {
+                auto on_definition_found = [&](const JSON &lsp_response) {
+                    try {
+                        if (!lsp_response.contains("result") || lsp_response["result"].empty()) {
+                            std::cerr << "LSP go_to_definition: No result found in response." << std::endl;
+                            return;
+                        }
+
+                        JSON location =
+                            lsp_response["result"].is_array() ? lsp_response["result"][0] : lsp_response["result"];
+
+                        if (!location.contains("uri") || !location.contains("range")) {
+                            std::cerr << "LSP go_to_definition: Missing uri or range in response." << std::endl;
+                            return;
+                        }
+
+                        std::string file_uri = location["uri"].get<std::string>();
+
+                        // Remove "file://" prefix if present
+                        std::string file_to_open = (file_uri.rfind("file://", 0) == 0) ? file_uri.substr(7) : file_uri;
+
+                        int line = location["range"]["start"]["line"].get<int>();
+                        int col = location["range"]["start"]["character"].get<int>();
+
+                        switch_files(viewport, lsp_client, file_to_open, true);
+                        viewport.set_active_buffer_line_col_under_cursor(line, col);
+                    } catch (const std::exception &e) {
+                        std::cerr << "LSP go_to_definition: Exception parsing response: " << e.what() << std::endl;
+                    }
+                };
+
+                lsp_client.go_to_definition(viewport.buffer.current_file_path, viewport.active_buffer_line_under_cursor,
+                                            viewport.active_buffer_col_under_cursor, on_definition_found);
+                /*lsp_client.goto_definition(viewport.buffer.current_file_path,
+                 * viewport.active_buffer_line_under_cursor,*/
+                /*                           viewport.active_buffer_col_under_cursor, on_definition_found);*/
+            }
+        });
         rcr.add_regex("^dd", [&](const std::smatch &m) {
             if (current_mode == MOVE_AND_EDIT) {
                 viewport.delete_line_at_cursor();
@@ -718,12 +786,41 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
             }
         });
 
+        bool editing_a_cpp_project = true;
+        if (editing_a_cpp_project) {
+
+            rcr.add_regex("^ cc", [&](const std::smatch &m) {
+                if (current_mode == MOVE_AND_EDIT) {
+                    std::filesystem::path current_path = viewport.buffer.current_file_path;
+                    if (current_path.extension() == ".hpp") {
+                        std::filesystem::path cpp_path = current_path;
+                        cpp_path.replace_extension(".cpp");
+
+                        if (std::filesystem::exists(cpp_path)) {
+                            switch_files(viewport, lsp_client, cpp_path.string(), true);
+                        }
+                    }
+                }
+            });
+
+            rcr.add_regex("^ hh", [&](const std::smatch &m) {
+                if (current_mode == MOVE_AND_EDIT) {
+                    std::filesystem::path current_path = viewport.buffer.current_file_path;
+                    if (current_path.extension() == ".cpp") {
+                        std::filesystem::path hpp_path = current_path;
+                        hpp_path.replace_extension(".hpp");
+
+                        if (std::filesystem::exists(hpp_path)) {
+                            switch_files(viewport, lsp_client, hpp_path.string(), true);
+                        }
+                    }
+                }
+            });
+        }
+
         configured_rcr = true;
     }
 
-    // making life easier one keystroke at a time.
-    std::function<bool(EKey)> jp = [&](EKey k) { return input_state.is_just_pressed(k); };
-    std::function<bool(EKey)> ip = [&](EKey k) { return input_state.is_pressed(k); };
     auto keys_just_pressed_this_tick = input_state.get_keys_just_pressed_this_tick();
     if (not fs_browser_is_active or current_mode != INSERT) {
 
@@ -755,6 +852,24 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                 if (jp(EKey::d)) {
                     viewport.scroll(5, 0);
                     key_pressed_based_command_run = true;
+                }
+                if (jp(EKey::o)) {
+                    viewport.history.go_back();
+                    auto [file_path, line, col] = viewport.history.get_current_history_flc();
+                    std::cout << "going back to: " << file_path << line << col << std::endl;
+                    if (file_path != viewport.buffer.current_file_path) {
+                        switch_files(viewport, lsp_client, file_path, false);
+                    }
+                    viewport.set_active_buffer_line_col_under_cursor(line, col, false);
+                }
+                if (jp(EKey::i)) {
+                    viewport.history.go_forward();
+                    auto [file_path, line, col] = viewport.history.get_current_history_flc();
+                    std::cout << "going forward to: " << file_path << line << col << std::endl;
+                    if (file_path != viewport.buffer.current_file_path) {
+                        switch_files(viewport, lsp_client, file_path, false);
+                    }
+                    viewport.set_active_buffer_line_col_under_cursor(line, col, false);
                 }
             }
             if (ip(EKey::LEFT_SHIFT)) {
@@ -886,25 +1001,11 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                 std::string file_to_open = currently_matched_files[0];
                 std::cout << "file_to_open: " << file_to_open << std::endl;
 
-                bool found_active_file_buffer = false;
-                for (auto &active_file_buffer : viewport.active_file_buffers) {
-                    std::cout << active_file_buffer.current_file_path << std::endl;
-                    if (active_file_buffer.current_file_path == file_to_open) {
-                        std::cout << "found matching buffer, using it " << std::endl;
-                        viewport.switch_buffers(active_file_buffer);
-                        found_active_file_buffer = true;
-                        fs_browser_is_active = false;
-                        fs_browser_search_query = "";
-                    }
-                }
-                if (not found_active_file_buffer) {
-                    std::cout << "didn't find matching buffer creating new buffer" << std::endl;
-                    LineTextBuffer ltb;
-                    ltb.load_file(file_to_open);
-                    viewport.switch_buffers(ltb);
-                    fs_browser_is_active = false;
-                    fs_browser_search_query = "";
-                }
+                switch_files(viewport, lsp_client, file_to_open, true);
+
+                fs_browser_is_active = false;
+                fs_browser_search_query = "";
+
                 return;
             }
         }
@@ -980,6 +1081,15 @@ bool is_integer(const std::string &str) {
 }
 
 int main(int argc, char *argv[]) {
+
+    ModalEditor modal_editor;
+    LSPClient lsp_client("/home/ccn/projects/cpp-toolbox-organization/editor/");
+
+    std::thread thread([&] {
+        while (true) {
+            lsp_client.process_requests_and_responses();
+        }
+    });
 
     int saved_for_automatic_column_adjustment = 0;
     int saved_last_col_for_automatic_column_adjustment = 0;
@@ -1094,9 +1204,9 @@ int main(int argc, char *argv[]) {
     std::string search_dir = ".";
     std::vector<std::string> ignore_dirs = {"build", ".git", "__pycache__"};
     std::vector<std::filesystem::path> searchable_files = rec_get_all_files(search_dir, ignore_dirs);
-    for (const auto &file : searchable_files) {
-        std::cout << file.string() << '\n';
-    }
+    /*for (const auto &file : searchable_files) {*/
+    /*    std::cout << file.string() << '\n';*/
+    /*}*/
     UI fs_browser(font_atlas);
     FileBrowser fb(1.5, 1.5);
 
@@ -1171,19 +1281,17 @@ int main(int argc, char *argv[]) {
         return 1; // Return an error code if no argument is provided
     }
 
-    std::string filename = argv[1]; // Get the file name from the first argument
+    std::string filename = argv[1];
 
     LineTextBuffer file_buffer;
     LineTextBuffer file_info;
     LineTextBuffer command_line;
 
-    if (!file_buffer.load_file(filename)) {
-        return 1; // Return an error code if the file couldn't be loaded
-    }
-
     EditorMode current_mode = MOVE_AND_EDIT;
     TemporalBinarySignal mode_change_signal;
     Viewport viewport(file_buffer, num_lines, num_cols, center_idx_y, center_idx_x);
+
+    switch_files(viewport, lsp_client, filename, true);
 
     TemporalBinarySignal insert_mode_signal;
 
@@ -1308,6 +1416,8 @@ int main(int argc, char *argv[]) {
         delta_time = current_time - last_time;
         last_time = current_time;
 
+        /*lsp_client.process_requests_and_responses();*/
+
         glfwGetFramebufferSize(window.glfw_window, &width, &height);
 
         glViewport(0, 0, width, height);
@@ -1366,7 +1476,7 @@ int main(int argc, char *argv[]) {
                       command_bar_input_signal, window, is_search_active, fs_browser_is_active, fs_browser_search_query,
                       searchable_files, fb, doids_for_textboxes_for_active_directory_for_later_removal, fs_browser,
                       search_results_changed_signal, selected_file_doid, currently_matched_files, rcr,
-                      potential_regex_command, configured_rcr, insert_mode_signal);
+                      potential_regex_command, configured_rcr, insert_mode_signal, lsp_client, modal_editor);
 
         if (automatic_column_adjustment) {
             snap_to_end_of_line_while_navigating(viewport, saved_for_automatic_column_adjustment,

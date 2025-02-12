@@ -44,6 +44,8 @@ class LineTextBuffer {
     bool load_file(const std::string &file_path);
     bool save_file();
 
+    std::string get_text() const;
+
     int line_count() const;
     std::string get_line(int line_index) const;
     std::string get_bounding_box_string(int start_line, int start_col, int end_line, int end_col) const;

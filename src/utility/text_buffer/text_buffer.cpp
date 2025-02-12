@@ -42,6 +42,14 @@ bool LineTextBuffer::save_file() {
     return true;
 }
 
+std::string LineTextBuffer::get_text() const {
+    std::string result;
+    for (const auto &line : lines) {
+        result += line + "\n";
+    }
+    return result;
+}
+
 int LineTextBuffer::line_count() const { return lines.size(); }
 
 std::string LineTextBuffer::get_line(int line_index) const {

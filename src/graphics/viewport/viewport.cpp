@@ -9,11 +9,11 @@ Viewport::Viewport(LineTextBuffer &initial_buffer, int num_lines, int num_cols, 
       selection_mode_on(false) {
 
     // Initialize the previous_state with the same dimensions as the viewport
-    previous_state.resize(num_lines, std::vector<char>(num_cols, ' '));
+    previous_viewport_screen.resize(num_lines, std::vector<char>(num_cols, ' '));
     active_file_buffers.push_back(initial_buffer);
 }
 
-void Viewport::switch_buffers(LineTextBuffer &ltb) {
+void Viewport::switch_buffers_and_adjust_viewport_position(LineTextBuffer &ltb, bool store_movement_to_history) {
     // Save the current active position before switching
     if (!buffer.current_file_path.empty()) {
         file_name_to_last_viewport_position[buffer.current_file_path] =
@@ -31,13 +31,13 @@ void Viewport::switch_buffers(LineTextBuffer &ltb) {
         active_file_buffers.push_back(ltb);
     }
 
-    // Restore the last cursor position if available
+    // restore the last cursor position if available
     auto it = file_name_to_last_viewport_position.find(ltb.current_file_path);
     if (it != file_name_to_last_viewport_position.end()) {
-        auto [line, col] = it->second; // Structured binding
-        set_active_buffer_line_col_under_cursor(line, col);
+        auto [line, col] = it->second;
+        set_active_buffer_line_col_under_cursor(line, col, store_movement_to_history);
     } else {
-        set_active_buffer_line_col_under_cursor(0, 0);
+        set_active_buffer_line_col_under_cursor(0, 0, store_movement_to_history);
     }
 }
 
@@ -49,7 +49,7 @@ void Viewport::tick() {
 bool Viewport::has_cell_changed(int line, int col) const {
     // Check if the given cell has changed by comparing current symbol with the previous state
     if (line >= 0 && line < num_lines && col >= 0 && col < num_cols) {
-        return get_symbol_at(line, col) != previous_state[line][col];
+        return get_symbol_at(line, col) != previous_viewport_screen[line][col];
     }
     return false; // If the line/col are out of bounds, return false
 }
@@ -63,7 +63,7 @@ std::vector<std::pair<int, int>> Viewport::get_changed_cells_since_last_tick() c
             char current_symbol = get_symbol_at(line, col);
 
             // If the symbol has changed, mark this cell as changed
-            if (current_symbol != previous_state[line][col]) {
+            if (current_symbol != previous_viewport_screen[line][col]) {
                 changed_cells.emplace_back(line, col);
             }
         }
@@ -75,15 +75,14 @@ std::vector<std::pair<int, int>> Viewport::get_changed_cells_since_last_tick() c
 void Viewport::update_previous_state() {
     for (int line = 0; line < num_lines; ++line) {
         for (int col = 0; col < num_cols; ++col) {
-            previous_state[line][col] = get_symbol_at(line, col);
+            previous_viewport_screen[line][col] = get_symbol_at(line, col);
         }
     }
 }
 
 void Viewport::scroll(int line_delta, int col_delta) {
-    active_buffer_line_under_cursor += line_delta;
-    active_buffer_col_under_cursor += col_delta;
-    moved_signal.toggle_state();
+    set_active_buffer_line_col_under_cursor(active_buffer_line_under_cursor + line_delta,
+                                            active_buffer_col_under_cursor + col_delta);
 }
 
 void Viewport::scroll_up() {
@@ -102,19 +101,22 @@ void Viewport::scroll_right() {
     scroll(0, 1); // Scroll right increases the column by 1
 }
 
-void Viewport::set_active_buffer_line_col_under_cursor(int line, int col) {
+void Viewport::set_active_buffer_line_col_under_cursor(int line, int col, bool store_pos_to_history) {
     active_buffer_line_under_cursor = line;
     active_buffer_col_under_cursor = col;
     moved_signal.toggle_state();
+    if (store_pos_to_history) {
+        history.add_flc_to_history(buffer.current_file_path, active_buffer_line_under_cursor,
+                                   active_buffer_col_under_cursor);
+    }
 };
 
-void Viewport::set_active_buffer_line_under_cursor(int line) {
-    active_buffer_line_under_cursor = line;
-    moved_signal.toggle_state();
+void Viewport::set_active_buffer_line_under_cursor(int line, bool store_pos_to_history) {
+    set_active_buffer_line_col_under_cursor(line, active_buffer_col_under_cursor, store_pos_to_history);
 }
-void Viewport::set_active_buffer_col_under_cursor(int col) {
-    active_buffer_col_under_cursor = col;
-    moved_signal.toggle_state();
+
+void Viewport::set_active_buffer_col_under_cursor(int col, bool store_pos_to_history) {
+    set_active_buffer_line_col_under_cursor(active_buffer_line_under_cursor, col, store_pos_to_history);
 }
 
 char Viewport::get_symbol_at(int line, int col) const {
