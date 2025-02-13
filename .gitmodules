@@ -73,3 +73,6 @@
 [submodule "src/utility/lsp_client"]
 	path = src/utility/lsp_client
 	url = git@github.com:cpp-toolbox/lsp_client.git
+[submodule "src/utility/resource_path"]
+	path = src/utility/resource_path
+	url = git@github.com:cpp-toolbox/resource_path.git

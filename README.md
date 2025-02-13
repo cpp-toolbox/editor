@@ -1,4 +1,26 @@
 # editor
+
+# setup 
+the editor integrates with clangd to support many nice features such as go to definition which makes coding much more enjoyable
+
+- working on cpp projects with tbx on windows
+    - install clangd
+        - through llvm's download: https://clangd.llvm.org/installation.html 
+             - note that the download usually comes in a tar.xz, see here: https://superuser.com/questions/390892/how-to-open-a-large-file-with-an-tar-xz-extension
+        - through visual studio, go to the installer and use desktop tools in the right panel under optional select the clangd option
+    - configure clangd path
+        - once you have your clangd installed you must point the editor to that path
+    - compiling
+        - the code you're working on should not be compiled with msvc, since msvc doesn't have the ability to generate compile commands it makes it impossible to integrate with language servers, this is the reason why editors like clion don't use the msvc compiler
+        - because of the above comment a good setup is to use msys2 with the gcc compiler.
+
+- linux
+    - install clangd, make sure you can run it
+
+
+# motivation
+
+
 This editor was created because I wanted to have a good c++ editor for windows. When I'm on windows writing c++ I find that the main editors people use are VSCode, Visual Studio, CLion, neovim/vim. Personally each one has something that annoys me a bit: 
 - VSCode: 
 

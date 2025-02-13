@@ -33,6 +33,7 @@
 #include "utility/periodic_signal/periodic_signal.hpp"
 #include "utility/config_file_parser/config_file_parser.hpp"
 #include "utility/lsp_client/lsp_client.hpp"
+#include "utility/resource_path/resource_path.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -76,6 +77,16 @@ std::string get_current_time_string() {
     std::ostringstream time_stream;
     time_stream << std::put_time(&local_tm, "%Y-%m-%d %H:%M:%S"); // Custom format
     return time_stream.str();
+}
+
+std::string remove_file_prefix(const std::string& file_uri) {
+#ifdef _WIN32
+    // On Windows, remove "file:///" prefix if present
+    return (file_uri.rfind("file:///", 0) == 0) ? file_uri.substr(8) : file_uri;
+#else
+    // On other platforms, remove "file://" prefix if present
+    return (file_uri.rfind("file://", 0) == 0) ? file_uri.substr(7) : file_uri;
+#endif
 }
 
 bool starts_with_any_prefix(const std::string &str, const std::vector<std::string> &prefixes) {
@@ -140,7 +151,7 @@ std::string get_mode_string(EditorMode current_mode) {
     return "";
 }
 
-void render(Viewport &viewport, Grid &screen_grid, Grid &status_bar_grid, Grid &command_bar_grid,
+void render(Viewport &viewport, vertex_geometry::Grid &screen_grid, vertex_geometry::Grid &status_bar_grid, vertex_geometry::Grid &command_bar_grid,
             std::string &command_bar_input, TextureAtlas &monospaced_font_atlas, Batcher &batcher,
             TemporalBinarySignal &mode_change_signal, TemporalBinarySignal &command_bar_input_signal, int center_idx_x,
             int center_idx_y, int num_cols, int num_lines, int col_where_selection_mode_started,
@@ -157,7 +168,7 @@ void render(Viewport &viewport, Grid &screen_grid, Grid &status_bar_grid, Grid &
     for (int line = 0; line < screen_grid.rows; line++) {
         for (int col = 0; col < screen_grid.cols; col++) {
             auto cell_rect = screen_grid.get_at(col, line);
-            IndexedVertices cell_ivs = cell_rect.get_ivs();
+            vertex_geometry::IndexedVertices cell_ivs = cell_rect.get_ivs();
             std::string cell_char(1, viewport.get_symbol_at(line, col));
             auto cell_char_tcs = monospaced_font_atlas.get_texture_coordinates_of_sub_texture(cell_char);
             // because the texture has the font inside the cell.
@@ -186,7 +197,7 @@ void render(Viewport &viewport, Grid &screen_grid, Grid &status_bar_grid, Grid &
         for (int col = 0; col < status_bar_grid.cols; col++) {
 
             auto cell_rect = status_bar_grid.get_at(col, line);
-            IndexedVertices cell_ivs = cell_rect.get_ivs();
+            vertex_geometry::IndexedVertices cell_ivs = cell_rect.get_ivs();
 
             std::string cell_char;
             if (col < mode_string.size()) {
@@ -210,7 +221,7 @@ void render(Viewport &viewport, Grid &screen_grid, Grid &status_bar_grid, Grid &
         for (int col = 0; col < command_bar_grid.cols; col++) {
 
             auto cell_rect = command_bar_grid.get_at(col, line);
-            IndexedVertices cell_ivs = cell_rect.get_ivs();
+            vertex_geometry::IndexedVertices cell_ivs = cell_rect.get_ivs();
 
             std::string cell_char;
             if (col < command_bar_input.size()) {
@@ -249,7 +260,7 @@ void render(Viewport &viewport, Grid &screen_grid, Grid &status_bar_grid, Grid &
         int clamped_center_idx_x = std::clamp(center_idx_x, 0, num_cols - 1);
 
         // Call the function with the clamped values
-        std::vector<Rectangle> visually_selected_rectangles = screen_grid.get_rectangles_in_bounding_box(
+        std::vector<vertex_geometry::Rectangle> visually_selected_rectangles = screen_grid.get_rectangles_in_bounding_box(
             clamped_visual_line_delta, clamped_visual_col_delta, clamped_center_idx_y, clamped_center_idx_x);
 
         int obj_id = 1;
@@ -344,7 +355,7 @@ void update_search_results(std::string &fs_browser_search_query, std::vector<std
     if (matching_files.empty()) {
         std::cout << "No matching files found for query: \"" << fs_browser_search_query << "\"." << std::endl;
     } else {
-        Grid file_rows(matching_files.size(), 1, fb.main_file_view_rect);
+        vertex_geometry::Grid file_rows(matching_files.size(), 1, fb.main_file_view_rect);
         auto file_rects = file_rows.get_column(0);
 
         // clear out old data
@@ -384,13 +395,13 @@ void switch_files(Viewport &viewport, LSPClient &lsp_client, const std::string &
     for (auto &active_file_buffer : viewport.active_file_buffers) {
         std::cout << active_file_buffer.current_file_path << std::endl;
         if (active_file_buffer.current_file_path == file_to_open) {
-            std::cout << "found matching buffer, using it " << std::endl;
+            std::cout << "found matching buffer for " << file_to_open << " using it." << std::endl;
             viewport.switch_buffers_and_adjust_viewport_position(active_file_buffer, store_movements_to_history);
             found_active_file_buffer = true;
         }
     }
     if (not found_active_file_buffer) {
-        std::cout << "didn't find matching buffer creating new buffer" << std::endl;
+        std::cout << "didn't find matching buffer creating new buffer for: " << file_to_open << std::endl;
         LineTextBuffer ltb;
         ltb.load_file(file_to_open);
         lsp_client.did_open(file_to_open);
@@ -754,8 +765,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
 
                         std::string file_uri = location["uri"].get<std::string>();
 
-                        // Remove "file://" prefix if present
-                        std::string file_to_open = (file_uri.rfind("file://", 0) == 0) ? file_uri.substr(7) : file_uri;
+                        std::string file_to_open = remove_file_prefix(file_uri);
 
                         int line = location["range"]["start"]["line"].get<int>();
                         int col = location["range"]["start"]["character"].get<int>();
@@ -1080,10 +1090,22 @@ bool is_integer(const std::string &str) {
     return (ss >> temp && ss.eof());
 }
 
+
+
+
 int main(int argc, char *argv[]) {
 
+    ResourcePath rp(false);
+
     ModalEditor modal_editor;
+
+
+#if defined(_WIN32) || defined(_WIN64)
+    LSPClient lsp_client(rp.gfp("C:\\Users\\ccn\\projects\\cpp-toolbox-organization\\editor\\").string(), "cpp", rp.gfp("C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\Llvm\\bin\\clangd.exe").string());
+#else
     LSPClient lsp_client("/home/ccn/projects/cpp-toolbox-organization/editor/");
+#endif
+
 
     std::thread thread([&] {
         while (true) {
@@ -1245,22 +1267,22 @@ int main(int argc, char *argv[]) {
     float command_bar_top_pos = -0.95;
     float top_line_pos = 1;
 
-    Rectangle file_buffer_rect =
-        create_rectangle_from_corners(glm::vec3(-1, top_line_pos, 0), glm::vec3(1, top_line_pos, 0),
+    vertex_geometry::Rectangle file_buffer_rect =
+        vertex_geometry::create_rectangle_from_corners(glm::vec3(-1, top_line_pos, 0), glm::vec3(1, top_line_pos, 0),
                                       glm::vec3(-1, status_bar_top_pos, 0), glm::vec3(1, status_bar_top_pos, 0));
 
-    Rectangle status_bar_rect =
-        create_rectangle_from_corners(glm::vec3(-1, status_bar_top_pos, 0), glm::vec3(1, status_bar_top_pos, 0),
+    vertex_geometry::Rectangle status_bar_rect =
+        vertex_geometry::create_rectangle_from_corners(glm::vec3(-1, status_bar_top_pos, 0), glm::vec3(1, status_bar_top_pos, 0),
                                       glm::vec3(-1, command_bar_top_pos, 0), glm::vec3(1, command_bar_top_pos, 0));
 
-    Rectangle command_bar_rect =
-        create_rectangle_from_corners(glm::vec3(-1, command_bar_top_pos, 0), glm::vec3(1, command_bar_top_pos, 0),
+    vertex_geometry::Rectangle command_bar_rect =
+        vertex_geometry::create_rectangle_from_corners(glm::vec3(-1, command_bar_top_pos, 0), glm::vec3(1, command_bar_top_pos, 0),
                                       glm::vec3(-1, -1, 0), glm::vec3(1, -1, 0));
 
-    /*Grid file_buffer_grid(num_lines, num_cols, */
-    Grid screen_grid(num_lines, num_cols, file_buffer_rect);
-    Grid status_bar_grid(1, num_cols, status_bar_rect);
-    Grid command_bar_grid(1, num_cols, command_bar_rect);
+    /*vertex_geometry::Grid file_buffer_grid(num_lines, num_cols, */
+    vertex_geometry::Grid screen_grid(num_lines, num_cols, file_buffer_rect);
+    vertex_geometry::Grid status_bar_grid(1, num_cols, status_bar_rect);
+    vertex_geometry::Grid command_bar_grid(1, num_cols, command_bar_rect);
 
     std::vector<SubTextIndex> search_results;
     int current_search_index = 0;  // to keep track of the current search result
