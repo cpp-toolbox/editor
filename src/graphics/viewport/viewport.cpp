@@ -43,7 +43,7 @@ void Viewport::switch_buffers_and_adjust_viewport_position(LineTextBuffer &ltb, 
 
 void Viewport::tick() {
     // Update the previous state with the current content
-    update_previous_state();
+    save_previous_viewport_screen();
 }
 
 bool Viewport::has_cell_changed(int line, int col) const {
@@ -72,7 +72,7 @@ std::vector<std::pair<int, int>> Viewport::get_changed_cells_since_last_tick() c
     return changed_cells;
 }
 
-void Viewport::update_previous_state() {
+void Viewport::save_previous_viewport_screen() {
     for (int line = 0; line < num_lines; ++line) {
         for (int col = 0; col < num_cols; ++col) {
             previous_viewport_screen[line][col] = get_symbol_at(line, col);
@@ -318,25 +318,17 @@ bool Viewport::create_new_line_at_cursor_and_scroll_down() {
 }
 
 bool Viewport::insert_character_at_cursor(char character) {
-
-    // Attempt to insert the character into the buffer
     if (buffer.insert_character(active_buffer_line_under_cursor, active_buffer_col_under_cursor, character)) {
-        // Adjust the cursor column offset to move right after insertion
         scroll_right();
-        return true; // Insertion successful
+        return true;
     }
-
-    return false; // Insertion failed (e.g., invalid position)
+    return false;
 }
 
 bool Viewport::insert_string_at_cursor(const std::string &str) {
-
-    // Attempt to insert the string into the buffer
     if (buffer.insert_string(active_buffer_line_under_cursor, active_buffer_col_under_cursor, str)) {
-        // Adjust the cursor column offset to move right after the string insertion
         scroll(0, str.size());
-        return true; // Insertion successful
+        return true;
     }
-
-    return false; // Insertion failed (e.g., invalid position)
+    return false;
 }

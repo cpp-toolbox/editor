@@ -63,6 +63,7 @@ class Viewport {
      * @brief Updates the viewport and checks if any cell has changed since the last tick.
      */
     void tick();
+    void save_previous_viewport_screen();
     std::vector<std::pair<int, int>> get_changed_cells_since_last_tick() const;
     bool has_cell_changed(int line, int col) const;
 
@@ -80,8 +81,6 @@ class Viewport {
     int cursor_col_offset;
 
     std::vector<std::vector<char>> previous_viewport_screen; ///< Stores the previous state of the viewport.
-
-    void update_previous_state();
 };
 
 #endif // VIEWPORT_HPP

@@ -79,7 +79,7 @@ std::string get_current_time_string() {
     return time_stream.str();
 }
 
-std::string remove_file_prefix(const std::string& file_uri) {
+std::string remove_file_prefix(const std::string &file_uri) {
 #ifdef _WIN32
     // On Windows, remove "file:///" prefix if present
     return (file_uri.rfind("file:///", 0) == 0) ? file_uri.substr(8) : file_uri;
@@ -151,11 +151,12 @@ std::string get_mode_string(EditorMode current_mode) {
     return "";
 }
 
-void render(Viewport &viewport, vertex_geometry::Grid &screen_grid, vertex_geometry::Grid &status_bar_grid, vertex_geometry::Grid &command_bar_grid,
-            std::string &command_bar_input, TextureAtlas &monospaced_font_atlas, Batcher &batcher,
-            TemporalBinarySignal &mode_change_signal, TemporalBinarySignal &command_bar_input_signal, int center_idx_x,
-            int center_idx_y, int num_cols, int num_lines, int col_where_selection_mode_started,
-            int line_where_selection_mode_started, EditorMode &current_mode, ShaderCache &shader_cache,
+void render(Viewport &viewport, vertex_geometry::Grid &screen_grid, vertex_geometry::Grid &status_bar_grid,
+            vertex_geometry::Grid &command_bar_grid, std::string &command_bar_input,
+            TextureAtlas &monospaced_font_atlas, Batcher &batcher, TemporalBinarySignal &mode_change_signal,
+            TemporalBinarySignal &command_bar_input_signal, int center_idx_x, int center_idx_y, int num_cols,
+            int num_lines, int col_where_selection_mode_started, int line_where_selection_mode_started,
+            EditorMode &current_mode, ShaderCache &shader_cache,
             std::unordered_map<EditorMode, glm::vec4> &mode_to_cursor_color, double delta_time,
             PeriodicSignal &one_second_signal_for_status_bar_time_update) {
 
@@ -260,8 +261,9 @@ void render(Viewport &viewport, vertex_geometry::Grid &screen_grid, vertex_geome
         int clamped_center_idx_x = std::clamp(center_idx_x, 0, num_cols - 1);
 
         // Call the function with the clamped values
-        std::vector<vertex_geometry::Rectangle> visually_selected_rectangles = screen_grid.get_rectangles_in_bounding_box(
-            clamped_visual_line_delta, clamped_visual_col_delta, clamped_center_idx_y, clamped_center_idx_x);
+        std::vector<vertex_geometry::Rectangle> visually_selected_rectangles =
+            screen_grid.get_rectangles_in_bounding_box(clamped_visual_line_delta, clamped_visual_col_delta,
+                                                       clamped_center_idx_y, clamped_center_idx_x);
 
         int obj_id = 1;
         for (auto &rect : visually_selected_rectangles) {
@@ -404,8 +406,36 @@ void switch_files(Viewport &viewport, LSPClient &lsp_client, const std::string &
         std::cout << "didn't find matching buffer creating new buffer for: " << file_to_open << std::endl;
         LineTextBuffer ltb;
         ltb.load_file(file_to_open);
-        lsp_client.did_open(file_to_open);
+        lsp_client.make_did_open_request(file_to_open);
         viewport.switch_buffers_and_adjust_viewport_position(ltb, store_movements_to_history);
+    }
+}
+
+void go_to_definition(JSON lsp_response, Viewport &viewport, LSPClient &lsp_client) {
+    try {
+        if (!lsp_response.contains("result") || lsp_response["result"].empty()) {
+            std::cerr << "LSP go_to_definition: No result found in response." << std::endl;
+            return;
+        }
+
+        JSON location = lsp_response["result"].is_array() ? lsp_response["result"][0] : lsp_response["result"];
+
+        if (!location.contains("uri") || !location.contains("range")) {
+            std::cerr << "LSP go_to_definition: Missing uri or range in response." << std::endl;
+            return;
+        }
+
+        std::string file_uri = location["uri"].get<std::string>();
+
+        std::string file_to_open = remove_file_prefix(file_uri);
+
+        int line = location["range"]["start"]["line"].get<int>();
+        int col = location["range"]["start"]["character"].get<int>();
+
+        switch_files(viewport, lsp_client, file_to_open, true);
+        viewport.set_active_buffer_line_col_under_cursor(line, col);
+    } catch (const std::exception &e) {
+        std::cerr << "LSP go_to_definition: Exception parsing response: " << e.what() << std::endl;
     }
 }
 
@@ -419,7 +449,8 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                    TemporalBinarySignal &search_results_changed_signal, int &selected_file_doid,
                    std::vector<std::string> &currently_matched_files, RegexCommandRunner &rcr,
                    std::string &potential_regex_command, bool &configured_rcr, TemporalBinarySignal &insert_mode_signal,
-                   LSPClient &lsp_client, ModalEditor &modal_editor) {
+                   LSPClient &lsp_client, ModalEditor &modal_editor,
+                   std::vector<std::function<void()>> &lsp_callbacks_to_run_synchronously) {
 
     // less keystrokes please:
     std::function<bool(EKey)> jp = [&](EKey k) { return input_state.is_just_pressed(k); };
@@ -748,37 +779,18 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
         });
         rcr.add_regex("^ gd", [&](const std::smatch &m) {
             if (current_mode == MOVE_AND_EDIT) {
-                auto on_definition_found = [&](const JSON &lsp_response) {
-                    try {
-                        if (!lsp_response.contains("result") || lsp_response["result"].empty()) {
-                            std::cerr << "LSP go_to_definition: No result found in response." << std::endl;
-                            return;
-                        }
-
-                        JSON location =
-                            lsp_response["result"].is_array() ? lsp_response["result"][0] : lsp_response["result"];
-
-                        if (!location.contains("uri") || !location.contains("range")) {
-                            std::cerr << "LSP go_to_definition: Missing uri or range in response." << std::endl;
-                            return;
-                        }
-
-                        std::string file_uri = location["uri"].get<std::string>();
-
-                        std::string file_to_open = remove_file_prefix(file_uri);
-
-                        int line = location["range"]["start"]["line"].get<int>();
-                        int col = location["range"]["start"]["character"].get<int>();
-
-                        switch_files(viewport, lsp_client, file_to_open, true);
-                        viewport.set_active_buffer_line_col_under_cursor(line, col);
-                    } catch (const std::exception &e) {
-                        std::cerr << "LSP go_to_definition: Exception parsing response: " << e.what() << std::endl;
-                    }
+                auto on_definition_found = [&](JSON lsp_response) {
+                    // NOTE: that lsp_response needs to be captured by value because it will go out of scope after this
+                    // function is called
+                    auto callback = [lsp_response, &viewport, &lsp_client]() {
+                        go_to_definition(lsp_response, viewport, lsp_client);
+                    };
+                    lsp_callbacks_to_run_synchronously.push_back(callback);
                 };
 
-                lsp_client.go_to_definition(viewport.buffer.current_file_path, viewport.active_buffer_line_under_cursor,
-                                            viewport.active_buffer_col_under_cursor, on_definition_found);
+                lsp_client.make_go_to_definition_request(viewport.buffer.current_file_path,
+                                                         viewport.active_buffer_line_under_cursor,
+                                                         viewport.active_buffer_col_under_cursor, on_definition_found);
                 /*lsp_client.goto_definition(viewport.buffer.current_file_path,
                  * viewport.active_buffer_line_under_cursor,*/
                 /*                           viewport.active_buffer_col_under_cursor, on_definition_found);*/
@@ -1090,22 +1102,27 @@ bool is_integer(const std::string &str) {
     return (ss >> temp && ss.eof());
 }
 
-
-
-
 int main(int argc, char *argv[]) {
+
+    // NOTE: because the lsp server runs in another thread asychronously
+    // if we allow the callbacks to be run the moment the lsp server responds
+    // then the order in which logic runs can be different on each iteration
+    // thus we queue up the callback logic into a vector so that we can
+    // handle it in the main thread
+    std::vector<std::function<void()>> lsp_callbacks_to_run_synchronously;
 
     ResourcePath rp(false);
 
     ModalEditor modal_editor;
 
-
 #if defined(_WIN32) || defined(_WIN64)
-    LSPClient lsp_client(rp.gfp("C:\\Users\\ccn\\projects\\cpp-toolbox-organization\\editor\\").string(), "cpp", rp.gfp("C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\Llvm\\bin\\clangd.exe").string());
+    LSPClient lsp_client(
+        rp.gfp("C:\\Users\\ccn\\projects\\cpp-toolbox-organization\\editor\\").string(), "cpp",
+        rp.gfp("C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\Llvm\\bin\\clangd.exe")
+            .string());
 #else
     LSPClient lsp_client("/home/ccn/projects/cpp-toolbox-organization/editor/");
 #endif
-
 
     std::thread thread([&] {
         while (true) {
@@ -1267,17 +1284,17 @@ int main(int argc, char *argv[]) {
     float command_bar_top_pos = -0.95;
     float top_line_pos = 1;
 
-    vertex_geometry::Rectangle file_buffer_rect =
-        vertex_geometry::create_rectangle_from_corners(glm::vec3(-1, top_line_pos, 0), glm::vec3(1, top_line_pos, 0),
-                                      glm::vec3(-1, status_bar_top_pos, 0), glm::vec3(1, status_bar_top_pos, 0));
+    vertex_geometry::Rectangle file_buffer_rect = vertex_geometry::create_rectangle_from_corners(
+        glm::vec3(-1, top_line_pos, 0), glm::vec3(1, top_line_pos, 0), glm::vec3(-1, status_bar_top_pos, 0),
+        glm::vec3(1, status_bar_top_pos, 0));
 
-    vertex_geometry::Rectangle status_bar_rect =
-        vertex_geometry::create_rectangle_from_corners(glm::vec3(-1, status_bar_top_pos, 0), glm::vec3(1, status_bar_top_pos, 0),
-                                      glm::vec3(-1, command_bar_top_pos, 0), glm::vec3(1, command_bar_top_pos, 0));
+    vertex_geometry::Rectangle status_bar_rect = vertex_geometry::create_rectangle_from_corners(
+        glm::vec3(-1, status_bar_top_pos, 0), glm::vec3(1, status_bar_top_pos, 0),
+        glm::vec3(-1, command_bar_top_pos, 0), glm::vec3(1, command_bar_top_pos, 0));
 
-    vertex_geometry::Rectangle command_bar_rect =
-        vertex_geometry::create_rectangle_from_corners(glm::vec3(-1, command_bar_top_pos, 0), glm::vec3(1, command_bar_top_pos, 0),
-                                      glm::vec3(-1, -1, 0), glm::vec3(1, -1, 0));
+    vertex_geometry::Rectangle command_bar_rect = vertex_geometry::create_rectangle_from_corners(
+        glm::vec3(-1, command_bar_top_pos, 0), glm::vec3(1, command_bar_top_pos, 0), glm::vec3(-1, -1, 0),
+        glm::vec3(1, -1, 0));
 
     /*vertex_geometry::Grid file_buffer_grid(num_lines, num_cols, */
     vertex_geometry::Grid screen_grid(num_lines, num_cols, file_buffer_rect);
@@ -1490,15 +1507,23 @@ int main(int argc, char *argv[]) {
 
         // render UI stuff
 
-        // not sure why this has to go here right now but it doesn't update if it comes after mofifying viewport.
-        viewport.tick();
+        // we must save the previous viewport screen before the screen is modified that way
+        // the changes made will be compared against the previous screen state
+        viewport.save_previous_viewport_screen();
 
         run_key_logic(input_state, current_mode, mode_change_signal, viewport, line_where_selection_mode_started,
                       col_where_selection_mode_started, search_results, current_search_index, command_bar_input,
                       command_bar_input_signal, window, is_search_active, fs_browser_is_active, fs_browser_search_query,
                       searchable_files, fb, doids_for_textboxes_for_active_directory_for_later_removal, fs_browser,
                       search_results_changed_signal, selected_file_doid, currently_matched_files, rcr,
-                      potential_regex_command, configured_rcr, insert_mode_signal, lsp_client, modal_editor);
+                      potential_regex_command, configured_rcr, insert_mode_signal, lsp_client, modal_editor,
+                      lsp_callbacks_to_run_synchronously);
+
+        for (auto &callback : lsp_callbacks_to_run_synchronously) {
+            std::cout << "running callback" << std::endl;
+            callback();
+        }
+        lsp_callbacks_to_run_synchronously.clear();
 
         if (automatic_column_adjustment) {
             snap_to_end_of_line_while_navigating(viewport, saved_for_automatic_column_adjustment,
