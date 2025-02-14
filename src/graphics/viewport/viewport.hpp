@@ -3,6 +3,7 @@
 
 #include "../../utility/text_buffer/text_buffer.hpp"
 #include "../../utility/hierarchical_history/hierarchical_history.hpp"
+#include <memory>
 #include <unordered_map>
 #include <vector>
 
@@ -15,17 +16,18 @@ class Viewport {
      * @param cursor_col_offset The initial cursor column offset.
      */
 
-    Viewport(LineTextBuffer &initial_buffer, int num_lines, int num_cols, int cursor_line_offset,
+    Viewport(std::shared_ptr<LineTextBuffer> initial_buffer, int num_lines, int num_cols, int cursor_line_offset,
              int cursor_col_offset);
 
     // TODO: this should not exist within the context of a viewport
     // instead it should be with a "ModalEditor" class
-    std::vector<LineTextBuffer> active_file_buffers;
+    std::vector<std::shared_ptr<LineTextBuffer>> active_file_buffers;
 
     HierarchicalHistory history;
 
     std::unordered_map<std::string, std::tuple<int, int>> file_name_to_last_viewport_position;
-    void switch_buffers_and_adjust_viewport_position(LineTextBuffer &ltb, bool store_movement_to_history = true);
+    void switch_buffers_and_adjust_viewport_position(std::shared_ptr<LineTextBuffer> ltb,
+                                                     bool store_movement_to_history = true);
 
     void scroll(int delta_row, int delta_col);
     void scroll_up();
@@ -44,16 +46,17 @@ class Viewport {
     void move_cursor_to_end_of_line();
     void move_cursor_to_middle_of_line();
 
-    bool create_new_line_above_cursor_and_scroll_up();
-    bool create_new_line_at_cursor_and_scroll_down();
-    bool insert_tab_at_cursor();
-    bool insert_character_at_cursor(char character);
+    TextDiff create_new_line_above_cursor_and_scroll_up();
+    const TextDiff create_new_line_at_cursor_and_scroll_down();
+
+    TextDiff insert_tab_at_cursor();
+    TextDiff insert_character_at_cursor(char character);
     bool insert_string_at_cursor(const std::string &str);
-    bool insert_character_at(int line, int col, char character);
+    TextDiff insert_character_at(int line, int col, char character);
 
     bool delete_line_at_cursor();
-    bool delete_character_at_active_position();
-    bool backspace_at_active_position();
+    TextDiff delete_character_at_active_position();
+    TextDiff backspace_at_active_position();
 
     void set_active_buffer_line_col_under_cursor(int line, int col, bool store_pos_to_history = true);
     void set_active_buffer_line_under_cursor(int line, bool store_pos_to_history = true);
@@ -67,7 +70,7 @@ class Viewport {
     std::vector<std::pair<int, int>> get_changed_cells_since_last_tick() const;
     bool has_cell_changed(int line, int col) const;
 
-    LineTextBuffer &buffer; ///< Reference to the buffer being viewed.
+    std::shared_ptr<LineTextBuffer> buffer;
     TemporalBinarySignal moved_signal;
     bool selection_mode_on;
 

@@ -59,27 +59,23 @@ std::string LineTextBuffer::get_line(int line_index) const {
     return "";
 }
 
-bool LineTextBuffer::delete_character(int line_index, int col_index) {
-    if (line_index >= lines.size()) {
+TextDiff LineTextBuffer::delete_character(int line_index, int col_index) {
+    if (line_index >= lines.size() or col_index >= lines[line_index].size()) {
         std::cerr << "Error: line index out of bounds.\n";
-        return false;
-    }
-    if (col_index >= lines[line_index].size()) {
-        std::cerr << "Error: Column index out of bounds.\n";
-        return false;
+        return EMPTY_TEXT_DIFF;
     }
 
     char deleted_char = lines[line_index][col_index];
     lines[line_index].erase(col_index, 1);
 
-    // Record the change in the undo stack
-    /*undo_stack.push(Diff(Diff::Type::DELETE, line_index, col_index, std::string(1, deleted_char)));*/
+    auto td = TextDiff({line_index, col_index, line_index, col_index + 1}, "");
+
     edit_signal.toggle_state();
     modified_without_save = true;
-    return true;
+    return td;
 }
 
-bool LineTextBuffer::insert_character(int line_index, int col_index, char character) {
+TextDiff LineTextBuffer::insert_character(int line_index, int col_index, char character) {
     // Ensure the line_index is within bounds, adding new lines if necessary
     if (line_index >= lines.size()) {
         lines.resize(line_index + 1, std::string()); // Adds empty lines up to line_index
@@ -94,15 +90,18 @@ bool LineTextBuffer::insert_character(int line_index, int col_index, char charac
     lines[line_index].insert(col_index, 1, character);
 
     // TODO: if we add new lines and stuff do we need to register those diffs as well?
-    // Record the change in the undo stack
+    // yes of course, do this later on.
 
+    // TODO: using the legacy diff here, change when we use diffs better
     undo_stack.push(Diff(Diff::Type::INSERT, line_index, col_index, std::string(1, character)));
+
+    auto td = TextDiff({line_index, col_index, line_index, col_index + 1}, std::string(1, character));
 
     // Toggle edit signal and mark as modified
     edit_signal.toggle_state();
     modified_without_save = true;
 
-    return true;
+    return td;
 }
 
 bool LineTextBuffer::insert_string(int line_index, int col_index, const std::string &str) {
@@ -163,16 +162,20 @@ bool LineTextBuffer::replace_line(int line_index, const std::string &new_content
     return true;
 }
 
-bool LineTextBuffer::insert_blank_line(int line_index) {
+TextDiff LineTextBuffer::insert_new_line(int line_index) {
+
     if (line_index < 0 || line_index > line_count()) {
-        return false;
+        return EMPTY_TEXT_DIFF;
     }
 
     lines.insert(lines.begin() + line_index, "");
     undo_stack.push(Diff(Diff::Type::INSERT, line_index, 0, ""));
     edit_signal.toggle_state();
     modified_without_save = true;
-    return true;
+
+    auto td = TextDiff({line_index, 0, line_index, 0}, "\n");
+
+    return td;
 }
 
 std::string LineTextBuffer::get_bounding_box_string(int start_line, int start_col, int end_line, int end_col) const {
@@ -241,23 +244,34 @@ bool LineTextBuffer::delete_bounding_box(int start_line, int start_col, int end_
     return true;
 }
 
-bool LineTextBuffer::insert_tab(int line_index, int col_index) {
+TextDiff LineTextBuffer::insert_tab(int line_index, int col_index) {
+
     if (line_index >= lines.size()) {
         std::cerr << "Error: line index out of bounds.\n";
-        return false;
+        return EMPTY_TEXT_DIFF;
     }
+
+    std::string padding;
     if (col_index > lines[line_index].size()) {
+        // Record padding if line is resized
+        padding = std::string(col_index - lines[line_index].size(), ' ');
         lines[line_index].resize(col_index, ' ');
     }
 
-    // Insert four spaces at the specified position
-    lines[line_index].insert(col_index, "    ");
+    lines[line_index].insert(col_index, TAB);
 
-    // Record the change in the undo stack
-    undo_stack.push(Diff(Diff::Type::INSERT, line_index, col_index, "    "));
+    std::string modification = padding + TAB;
+    size_t start_col = lines[line_index].size() - padding.size();
+    size_t end_col = start_col + modification.size();
+
+    auto td = create_insertion_diff(line_index, col_index, modification);
+
+    // TODO: what's pushed onto the stack here is wrong, fix this later
+    undo_stack.push(Diff(Diff::Type::INSERT, line_index, col_index, TAB));
     edit_signal.toggle_state();
     modified_without_save = true;
-    return true;
+
+    return td;
 }
 
 std::string LineTextBuffer::get_last_deleted_content() const {
@@ -508,9 +522,9 @@ std::string escape_special_chars(const std::string &input) {
     return result;
 }
 
-std::vector<SubTextIndex> LineTextBuffer::find_forward_matches(int line_index, int col_index,
-                                                               const std::string &regex_str) {
-    std::vector<SubTextIndex> matches;
+std::vector<TextRange> LineTextBuffer::find_forward_matches(int line_index, int col_index,
+                                                            const std::string &regex_str) {
+    std::vector<TextRange> matches;
     std::string escaped_regex = escape_special_chars(regex_str);
     std::regex pattern(escaped_regex);
 
@@ -526,7 +540,7 @@ std::vector<SubTextIndex> LineTextBuffer::find_forward_matches(int line_index, i
         while (std::regex_search(remaining_text, match, pattern)) {
             int start_col = start_pos + match.position(0);
             int end_col = start_pos + match.position(0) + match.length(0);
-            matches.push_back(SubTextIndex(i, start_col, i, end_col));
+            matches.push_back(TextRange(i, start_col, i, end_col));
             remaining_text = match.suffix().str();
         }
     }
@@ -534,9 +548,9 @@ std::vector<SubTextIndex> LineTextBuffer::find_forward_matches(int line_index, i
 }
 
 // Backward search function
-std::vector<SubTextIndex> LineTextBuffer::find_backward_matches(int line_index, int col_index,
-                                                                const std::string &regex_str) {
-    std::vector<SubTextIndex> matches;
+std::vector<TextRange> LineTextBuffer::find_backward_matches(int line_index, int col_index,
+                                                             const std::string &regex_str) {
+    std::vector<TextRange> matches;
     std::string escaped_regex = escape_special_chars(regex_str);
     std::regex pattern(escaped_regex);
 
@@ -552,7 +566,7 @@ std::vector<SubTextIndex> LineTextBuffer::find_backward_matches(int line_index, 
         while (std::regex_search(remaining_text, match, pattern)) {
             int start_col = match.position(0);
             int end_col = match.position(0) + match.length(0);
-            matches.push_back(SubTextIndex(i, start_col, i, end_col));
+            matches.push_back(TextRange(i, start_col, i, end_col));
             remaining_text = match.suffix().str();
         }
     }

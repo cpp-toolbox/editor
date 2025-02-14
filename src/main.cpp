@@ -1,3 +1,5 @@
+// TODO: list
+// for every operation that edits something we need to register a did change event
 // add logic for going up and down in the search menu
 // add in multiple textbuffers for a viewport
 // eventually get to highlighting, later on though check out
@@ -34,6 +36,7 @@
 #include "utility/config_file_parser/config_file_parser.hpp"
 #include "utility/lsp_client/lsp_client.hpp"
 #include "utility/resource_path/resource_path.hpp"
+#include "utility/text_diff/text_diff.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -160,8 +163,7 @@ void render(Viewport &viewport, vertex_geometry::Grid &screen_grid, vertex_geome
             std::unordered_map<EditorMode, glm::vec4> &mode_to_cursor_color, double delta_time,
             PeriodicSignal &one_second_signal_for_status_bar_time_update) {
 
-    bool should_replace = viewport.moved_signal.has_just_changed() or viewport.buffer.edit_signal.has_just_changed();
-
+    bool should_replace = viewport.moved_signal.has_just_changed() or viewport.buffer->edit_signal.has_just_changed();
     auto changed_cells = viewport.get_changed_cells_since_last_tick();
 
     // FILE BUFFER RENDER
@@ -189,8 +191,8 @@ void render(Viewport &viewport, vertex_geometry::Grid &screen_grid, vertex_geome
 
     // STATUS BAR
     std::string mode_string =
-        get_mode_string(current_mode) + " | " + extract_filename(viewport.buffer.current_file_path) +
-        (viewport.buffer.modified_without_save ? "[+]" : "") + " | " + get_current_time_string() + " |";
+        get_mode_string(current_mode) + " | " + extract_filename(viewport.buffer->current_file_path) +
+        (viewport.buffer->modified_without_save ? "[+]" : "") + " | " + get_current_time_string() + " |";
 
     bool should_update_status_bar = one_second_signal_for_status_bar_time_update.process_and_get_signal();
 
@@ -393,19 +395,21 @@ void update_search_results(std::string &fs_browser_search_query, std::vector<std
 
 void switch_files(Viewport &viewport, LSPClient &lsp_client, const std::string &file_to_open,
                   bool store_movements_to_history) {
+
     bool found_active_file_buffer = false;
-    for (auto &active_file_buffer : viewport.active_file_buffers) {
-        std::cout << active_file_buffer.current_file_path << std::endl;
-        if (active_file_buffer.current_file_path == file_to_open) {
+    for (auto active_file_buffer : viewport.active_file_buffers) {
+        std::cout << active_file_buffer->current_file_path << std::endl;
+        if (active_file_buffer->current_file_path == file_to_open) {
             std::cout << "found matching buffer for " << file_to_open << " using it." << std::endl;
             viewport.switch_buffers_and_adjust_viewport_position(active_file_buffer, store_movements_to_history);
             found_active_file_buffer = true;
         }
     }
+
     if (not found_active_file_buffer) {
         std::cout << "didn't find matching buffer creating new buffer for: " << file_to_open << std::endl;
-        LineTextBuffer ltb;
-        ltb.load_file(file_to_open);
+        auto ltb = std::make_shared<LineTextBuffer>();
+        ltb->load_file(file_to_open);
         lsp_client.make_did_open_request(file_to_open);
         viewport.switch_buffers_and_adjust_viewport_position(ltb, store_movements_to_history);
     }
@@ -441,7 +445,7 @@ void go_to_definition(JSON lsp_response, Viewport &viewport, LSPClient &lsp_clie
 
 void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBinarySignal &mode_change_signal,
                    Viewport &viewport, int &line_where_selection_mode_started, int &col_where_selection_mode_started,
-                   std::vector<SubTextIndex> &search_results, int &current_search_index, std::string &command_bar_input,
+                   std::vector<TextRange> &search_results, int &current_search_index, std::string &command_bar_input,
                    TemporalBinarySignal &command_bar_input_signal, Window window, bool &is_search_active,
                    bool &fs_browser_is_active, std::string &fs_browser_search_query,
                    std::vector<std::filesystem::path> &searchable_files, FileBrowser &fb,
@@ -459,13 +463,17 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
     if (not configured_rcr) {
         rcr.add_regex("^x", [&](const std::smatch &m) {
             if (current_mode == MOVE_AND_EDIT) {
-                viewport.delete_character_at_active_position();
+                auto td = viewport.delete_character_at_active_position();
+                if (td != EMPTY_TEXT_DIFF) {
+                    lsp_client.make_did_change_request(viewport.buffer->current_file_path, td);
+                }
             }
 
             if (current_mode == VISUAL_SELECT) {
-                viewport.buffer.delete_bounding_box(line_where_selection_mode_started, col_where_selection_mode_started,
-                                                    viewport.active_buffer_line_under_cursor,
-                                                    viewport.active_buffer_col_under_cursor);
+                // TODO: make change request
+                viewport.buffer->delete_bounding_box(
+                    line_where_selection_mode_started, col_where_selection_mode_started,
+                    viewport.active_buffer_line_under_cursor, viewport.active_buffer_col_under_cursor);
 
                 viewport.set_active_buffer_line_col_under_cursor(line_where_selection_mode_started,
                                                                  col_where_selection_mode_started);
@@ -490,11 +498,13 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                     // Uppercase 'P' - insert content from the clipboard
                     const char *clipboard_content = glfwGetClipboardString(window.glfw_window);
                     if (clipboard_content) {
+                        // TODO: make change request
                         viewport.insert_string_at_cursor(clipboard_content);
                     }
                 } else if (m.str(0) == "p") {
                     // Lowercase 'p' - insert the last deleted content
-                    viewport.insert_string_at_cursor(viewport.buffer.get_last_deleted_content());
+                    // TODO: make change request
+                    viewport.insert_string_at_cursor(viewport.buffer->get_last_deleted_content());
                 }
             }
         });
@@ -539,7 +549,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
         });
         rcr.add_regex("^I", [&](const std::smatch &m) {
             if (current_mode == MOVE_AND_EDIT) {
-                int ciofnwc = viewport.buffer.find_col_idx_of_first_non_whitespace_character_in_line(
+                int ciofnwc = viewport.buffer->find_col_idx_of_first_non_whitespace_character_in_line(
                     viewport.active_buffer_line_under_cursor);
                 viewport.set_active_buffer_col_under_cursor(ciofnwc);
                 current_mode = INSERT;
@@ -549,7 +559,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
         });
         rcr.add_regex("^\\^", [&](const std::smatch &m) {
             if (current_mode == MOVE_AND_EDIT) {
-                int ciofnwc = viewport.buffer.find_col_idx_of_first_non_whitespace_character_in_line(
+                int ciofnwc = viewport.buffer->find_col_idx_of_first_non_whitespace_character_in_line(
                     viewport.active_buffer_line_under_cursor);
                 viewport.set_active_buffer_col_under_cursor(ciofnwc);
             }
@@ -562,7 +572,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                 int line_delta = 0, col_delta = 0;
                 switch (direction) {
                 case 'j':
-                    if (viewport.buffer.line_count() > viewport.active_buffer_line_under_cursor + 1) {
+                    if (viewport.buffer->line_count() > viewport.active_buffer_line_under_cursor + 1) {
                         line_delta = count;
                     }
                     break; // Scroll down
@@ -577,7 +587,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                     }
                     break; // Scroll left
                 case 'l':
-                    const std::string &line = viewport.buffer.get_line(viewport.active_buffer_line_under_cursor);
+                    const std::string &line = viewport.buffer->get_line(viewport.active_buffer_line_under_cursor);
 
                     // TODO: this is bad because it stops me from being able to scroll rightware
                     // if I want to on a blank line which is a real use case because sometimes
@@ -600,7 +610,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
             std::string digits = m[1].str();
 
             if (digits.empty()) {
-                int last_line_index = viewport.buffer.line_count() - 1;
+                int last_line_index = viewport.buffer->line_count() - 1;
                 viewport.set_active_buffer_line_under_cursor(last_line_index);
             } else {
                 int number = std::stoi(digits);
@@ -616,16 +626,16 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
 
             // Handle motion commands
             if (motion == "f") {
-                col_idx = viewport.buffer.find_rightward_index(viewport.active_buffer_line_under_cursor,
-                                                               viewport.active_buffer_col_under_cursor, character);
+                col_idx = viewport.buffer->find_rightward_index(viewport.active_buffer_line_under_cursor,
+                                                                viewport.active_buffer_col_under_cursor, character);
             } else if (motion == "F") {
-                col_idx = viewport.buffer.find_leftward_index(viewport.active_buffer_line_under_cursor,
-                                                              viewport.active_buffer_col_under_cursor, character);
+                col_idx = viewport.buffer->find_leftward_index(viewport.active_buffer_line_under_cursor,
+                                                               viewport.active_buffer_col_under_cursor, character);
             } else if (motion == "t") {
-                col_idx = viewport.buffer.find_rightward_index_before(
+                col_idx = viewport.buffer->find_rightward_index_before(
                     viewport.active_buffer_line_under_cursor, viewport.active_buffer_col_under_cursor, character);
             } else if (motion == "T") {
-                col_idx = viewport.buffer.find_leftward_index_before(
+                col_idx = viewport.buffer->find_leftward_index_before(
                     viewport.active_buffer_line_under_cursor, viewport.active_buffer_col_under_cursor, character);
             }
 
@@ -633,9 +643,9 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
             if (col_idx != -1) {
                 if (!action.empty()) {
                     // If action is 'c' or 'd', handle deletion and mode change
-                    viewport.buffer.delete_bounding_box(viewport.active_buffer_line_under_cursor,
-                                                        viewport.active_buffer_col_under_cursor,
-                                                        viewport.active_buffer_line_under_cursor, col_idx);
+                    viewport.buffer->delete_bounding_box(viewport.active_buffer_line_under_cursor,
+                                                         viewport.active_buffer_col_under_cursor,
+                                                         viewport.active_buffer_line_under_cursor, col_idx);
                     if (action == "c") {
                         current_mode = INSERT;
                         mode_change_signal.toggle_state();
@@ -671,25 +681,25 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
             if (motion == "w") {
                 // minus one is used here to mimic default vim behavior and not to delet the first character of the next
                 // word
-                col_idx = viewport.buffer.find_forward_by_word_index(viewport.active_buffer_line_under_cursor,
-                                                                     viewport.active_buffer_col_under_cursor) -
+                col_idx = viewport.buffer->find_forward_by_word_index(viewport.active_buffer_line_under_cursor,
+                                                                      viewport.active_buffer_col_under_cursor) -
                           1;
             } else if (motion == "e") {
-                col_idx = viewport.buffer.find_forward_to_end_of_word(viewport.active_buffer_line_under_cursor,
-                                                                      viewport.active_buffer_col_under_cursor);
+                col_idx = viewport.buffer->find_forward_to_end_of_word(viewport.active_buffer_line_under_cursor,
+                                                                       viewport.active_buffer_col_under_cursor);
             } else if (motion == "b") {
-                col_idx = viewport.buffer.find_backward_to_start_of_word(viewport.active_buffer_line_under_cursor,
-                                                                         viewport.active_buffer_col_under_cursor);
+                col_idx = viewport.buffer->find_backward_to_start_of_word(viewport.active_buffer_line_under_cursor,
+                                                                          viewport.active_buffer_col_under_cursor);
             } else if (motion == "B") {
-                col_idx = viewport.buffer.find_backward_by_word_index(viewport.active_buffer_line_under_cursor,
-                                                                      viewport.active_buffer_col_under_cursor);
+                col_idx = viewport.buffer->find_backward_by_word_index(viewport.active_buffer_line_under_cursor,
+                                                                       viewport.active_buffer_col_under_cursor);
             }
 
             // Apply action based on motion result
             if (col_idx != -1) {
-                viewport.buffer.delete_bounding_box(viewport.active_buffer_line_under_cursor,
-                                                    viewport.active_buffer_col_under_cursor,
-                                                    viewport.active_buffer_line_under_cursor, col_idx);
+                viewport.buffer->delete_bounding_box(viewport.active_buffer_line_under_cursor,
+                                                     viewport.active_buffer_col_under_cursor,
+                                                     viewport.active_buffer_line_under_cursor, col_idx);
                 if (command == "c") {
                     current_mode = INSERT;
                     insert_mode_signal.toggle_state();
@@ -707,16 +717,16 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
             int right_match_col = -1;
 
             if (bracket_type == "b") {
-                left_match_col = viewport.buffer.find_column_index_of_previous_left_bracket(
+                left_match_col = viewport.buffer->find_column_index_of_previous_left_bracket(
                     viewport.active_buffer_line_under_cursor, viewport.active_buffer_col_under_cursor);
-                right_match_col = viewport.buffer.find_column_index_of_next_right_bracket(
+                right_match_col = viewport.buffer->find_column_index_of_next_right_bracket(
                     viewport.active_buffer_line_under_cursor, viewport.active_buffer_col_under_cursor);
             }
 
             if (bracket_type == "B") {
-                left_match_col = viewport.buffer.find_column_index_of_character_leftward(
+                left_match_col = viewport.buffer->find_column_index_of_character_leftward(
                     viewport.active_buffer_line_under_cursor, viewport.active_buffer_col_under_cursor, '{');
-                right_match_col = viewport.buffer.find_column_index_of_next_character(
+                right_match_col = viewport.buffer->find_column_index_of_next_character(
                     viewport.active_buffer_line_under_cursor, viewport.active_buffer_col_under_cursor, '}');
             }
 
@@ -729,8 +739,8 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                 right_match_col--;
             }
 
-            viewport.buffer.delete_bounding_box(viewport.active_buffer_line_under_cursor, right_match_col,
-                                                viewport.active_buffer_line_under_cursor, left_match_col);
+            viewport.buffer->delete_bounding_box(viewport.active_buffer_line_under_cursor, right_match_col,
+                                                 viewport.active_buffer_line_under_cursor, left_match_col);
             viewport.set_active_buffer_line_col_under_cursor(viewport.active_buffer_line_under_cursor, left_match_col);
         });
 
@@ -744,16 +754,25 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
             if (not ip(EKey::LEFT_CONTROL) and current_mode == MOVE_AND_EDIT) {
                 if (m.str() == "O") {
                     // Create a new line above the cursor and scroll up
-                    viewport.create_new_line_above_cursor_and_scroll_up();
+                    auto td = viewport.create_new_line_above_cursor_and_scroll_up();
+                    if (td != EMPTY_TEXT_DIFF) {
+                        lsp_client.make_did_change_request(viewport.buffer->current_file_path, td);
+                    }
                 } else {
                     // Create a new line below the cursor and scroll down
-                    viewport.create_new_line_at_cursor_and_scroll_down();
+                    auto td = viewport.create_new_line_at_cursor_and_scroll_down();
+                    if (td != EMPTY_TEXT_DIFF) {
+                        lsp_client.make_did_change_request(viewport.buffer->current_file_path, td);
+                    }
                 }
 
-                for (int i = 0; i < viewport.buffer.get_indentation_level(viewport.active_buffer_line_under_cursor,
-                                                                          viewport.active_buffer_col_under_cursor);
+                for (int i = 0; i < viewport.buffer->get_indentation_level(viewport.active_buffer_line_under_cursor,
+                                                                           viewport.active_buffer_col_under_cursor);
                      i++) {
-                    viewport.insert_tab_at_cursor();
+                    auto td = viewport.insert_tab_at_cursor();
+                    if (td != EMPTY_TEXT_DIFF) {
+                        lsp_client.make_did_change_request(viewport.buffer->current_file_path, td);
+                    }
                 }
 
                 current_mode = INSERT;
@@ -764,12 +783,12 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
 
         rcr.add_regex("^u", [&](const std::smatch &m) {
             if (current_mode == MOVE_AND_EDIT) {
-                viewport.buffer.undo();
+                viewport.buffer->undo();
             }
         });
         rcr.add_regex("^r", [&](const std::smatch &m) {
             if (current_mode == MOVE_AND_EDIT) {
-                viewport.buffer.redo();
+                viewport.buffer->redo();
             }
         });
         rcr.add_regex("^ sf", [&](const std::smatch &m) {
@@ -788,12 +807,9 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                     lsp_callbacks_to_run_synchronously.push_back(callback);
                 };
 
-                lsp_client.make_go_to_definition_request(viewport.buffer.current_file_path,
+                lsp_client.make_go_to_definition_request(viewport.buffer->current_file_path,
                                                          viewport.active_buffer_line_under_cursor,
                                                          viewport.active_buffer_col_under_cursor, on_definition_found);
-                /*lsp_client.goto_definition(viewport.buffer.current_file_path,
-                 * viewport.active_buffer_line_under_cursor,*/
-                /*                           viewport.active_buffer_col_under_cursor, on_definition_found);*/
             }
         });
         rcr.add_regex("^dd", [&](const std::smatch &m) {
@@ -803,7 +819,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
         });
         rcr.add_regex("^yy", [&](const std::smatch &m) {
             if (current_mode == MOVE_AND_EDIT) {
-                std::string current_line = viewport.buffer.get_line(viewport.active_buffer_line_under_cursor);
+                std::string current_line = viewport.buffer->get_line(viewport.active_buffer_line_under_cursor);
                 glfwSetClipboardString(window.glfw_window, current_line.c_str());
             }
         });
@@ -813,7 +829,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
 
             rcr.add_regex("^ cc", [&](const std::smatch &m) {
                 if (current_mode == MOVE_AND_EDIT) {
-                    std::filesystem::path current_path = viewport.buffer.current_file_path;
+                    std::filesystem::path current_path = viewport.buffer->current_file_path;
                     if (current_path.extension() == ".hpp") {
                         std::filesystem::path cpp_path = current_path;
                         cpp_path.replace_extension(".cpp");
@@ -827,7 +843,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
 
             rcr.add_regex("^ hh", [&](const std::smatch &m) {
                 if (current_mode == MOVE_AND_EDIT) {
-                    std::filesystem::path current_path = viewport.buffer.current_file_path;
+                    std::filesystem::path current_path = viewport.buffer->current_file_path;
                     if (current_path.extension() == ".cpp") {
                         std::filesystem::path hpp_path = current_path;
                         hpp_path.replace_extension(".hpp");
@@ -839,7 +855,6 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                 }
             });
         }
-
         configured_rcr = true;
     }
 
@@ -879,7 +894,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                     viewport.history.go_back();
                     auto [file_path, line, col] = viewport.history.get_current_history_flc();
                     std::cout << "going back to: " << file_path << line << col << std::endl;
-                    if (file_path != viewport.buffer.current_file_path) {
+                    if (file_path != viewport.buffer->current_file_path) {
                         switch_files(viewport, lsp_client, file_path, false);
                     }
                     viewport.set_active_buffer_line_col_under_cursor(line, col, false);
@@ -888,7 +903,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                     viewport.history.go_forward();
                     auto [file_path, line, col] = viewport.history.get_current_history_flc();
                     std::cout << "going forward to: " << file_path << line << col << std::endl;
-                    if (file_path != viewport.buffer.current_file_path) {
+                    if (file_path != viewport.buffer->current_file_path) {
                         switch_files(viewport, lsp_client, file_path, false);
                     }
                     viewport.set_active_buffer_line_col_under_cursor(line, col, false);
@@ -897,7 +912,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
             if (ip(EKey::LEFT_SHIFT)) {
 
                 if (jp(EKey::m)) {
-                    int last_line_index = (viewport.buffer.line_count() - 1) / 2;
+                    int last_line_index = (viewport.buffer->line_count() - 1) / 2;
                     viewport.set_active_buffer_line_under_cursor(last_line_index);
                     key_pressed_based_command_run = true;
                 }
@@ -910,7 +925,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                         // Move to the previous search result, using forced positive modulo
                         current_search_index =
                             (current_search_index - 1 + search_results.size()) % search_results.size();
-                        SubTextIndex sti = search_results[current_search_index];
+                        TextRange sti = search_results[current_search_index];
                         viewport.set_active_buffer_line_col_under_cursor(sti.start_line, sti.start_col);
 
                     } else {
@@ -924,7 +939,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
 
                     if (!search_results.empty()) {
                         current_search_index = (current_search_index + 1) % search_results.size();
-                        SubTextIndex sti = search_results[current_search_index];
+                        TextRange sti = search_results[current_search_index];
                         viewport.set_active_buffer_line_col_under_cursor(sti.start_line, sti.start_col);
                     } else {
                         std::cout << "No search results found" << std::endl;
@@ -955,7 +970,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
             // only doing this cause space isn't handled by the char callback
             if (jp(EKey::ENTER)) {
                 if (command_bar_input == ":w") {
-                    viewport.buffer.save_file();
+                    viewport.buffer->save_file();
                     key_pressed_based_command_run = true;
                 }
                 if (command_bar_input == ":q") {
@@ -970,8 +985,8 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                     // Forward search command
                     std::string search_request = command_bar_input.substr(1); // remove the "/"
                     search_results =
-                        viewport.buffer.find_forward_matches(viewport.active_buffer_line_under_cursor,
-                                                             viewport.active_buffer_col_under_cursor, search_request);
+                        viewport.buffer->find_forward_matches(viewport.active_buffer_line_under_cursor,
+                                                              viewport.active_buffer_col_under_cursor, search_request);
                     if (!search_results.empty()) {
                         std::cout << "search active true now" << std::endl;
                         current_search_index = 0; // start from the first result
@@ -1052,11 +1067,18 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
 
     if (current_mode == INSERT) {
         if (jp(EKey::ENTER)) {
-            viewport.create_new_line_at_cursor_and_scroll_down();
-            for (int i = 0; i < viewport.buffer.get_indentation_level(viewport.active_buffer_line_under_cursor,
-                                                                      viewport.active_buffer_col_under_cursor);
+            auto td = viewport.create_new_line_at_cursor_and_scroll_down();
+            if (td != EMPTY_TEXT_DIFF) {
+                lsp_client.make_did_change_request(viewport.buffer->current_file_path, td);
+            }
+            // TODO: don't use a loop make it so you can pass in the indentation level instead
+            for (int i = 0; i < viewport.buffer->get_indentation_level(viewport.active_buffer_line_under_cursor,
+                                                                       viewport.active_buffer_col_under_cursor);
                  i++) {
-                viewport.insert_tab_at_cursor();
+                auto td = viewport.insert_tab_at_cursor();
+                if (td != EMPTY_TEXT_DIFF) {
+                    lsp_client.make_did_change_request(viewport.buffer->current_file_path, td);
+                }
             }
         }
     }
@@ -1065,7 +1087,7 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
 // code to make sure the cursor stays within the lines
 void snap_to_end_of_line_while_navigating(Viewport &viewport, int &saved, int &saved_last_col, int &saved_last_line) {
 
-    const std::string &line = viewport.buffer.get_line(viewport.active_buffer_line_under_cursor);
+    const std::string &line = viewport.buffer->get_line(viewport.active_buffer_line_under_cursor);
 
     if (line.size() < saved_last_col) {
         if (saved == 0) {
@@ -1301,7 +1323,7 @@ int main(int argc, char *argv[]) {
     vertex_geometry::Grid status_bar_grid(1, num_cols, status_bar_rect);
     vertex_geometry::Grid command_bar_grid(1, num_cols, command_bar_rect);
 
-    std::vector<SubTextIndex> search_results;
+    std::vector<TextRange> search_results;
     int current_search_index = 0;  // to keep track of the current search result
     bool is_search_active = false; // to check if a search is in progress
 
@@ -1322,7 +1344,7 @@ int main(int argc, char *argv[]) {
 
     std::string filename = argv[1];
 
-    LineTextBuffer file_buffer;
+    auto file_buffer = std::make_shared<LineTextBuffer>();
     LineTextBuffer file_info;
     LineTextBuffer command_line;
 
@@ -1347,11 +1369,16 @@ int main(int argc, char *argv[]) {
                 // Convert the character code to a character
                 char character = static_cast<char>(character_code);
 
-                // Insert the character at the current cursor position
-                if (!viewport.insert_character_at_cursor(character)) {
-                    // Handle the case where the insertion failed
-                    std::cerr << "Failed to insert character at cursor position.\n";
-                }
+                auto td = viewport.insert_character_at_cursor(character);
+                lsp_client.make_did_change_request(viewport.buffer->current_file_path, td);
+
+                /*// Insert the character at the current cursor position*/
+                /*if (!viewport.insert_character_at_cursor(character)) {*/
+                /*    viewport.active_buffer_col_under_cursor viewport.active_buffer_line_under_cursor*/
+                /*            // Handle the case where the insertion failed*/
+                /*            std::cerr*/
+                /*        << "Failed to insert character at cursor position.\n";*/
+                /*}*/
             }
 
             if (current_mode == COMMAND) {
@@ -1390,7 +1417,7 @@ int main(int argc, char *argv[]) {
                         // print out the key that was just pressed
                         std::cout << "key_str:" << key_str << std::endl;
 
-                        if (key_str == "u" && viewport.buffer.get_last_deleted_content() == "") {
+                        if (key_str == "u" && viewport.buffer->get_last_deleted_content() == "") {
                             command_bar_input = "Ain't no more history!";
                             command_bar_input_signal.toggle_state();
                         }
@@ -1421,18 +1448,24 @@ int main(int argc, char *argv[]) {
                 } else {
                     std::cout << "non seach backspace" << std::endl;
                     if (current_mode == INSERT) {
-                        viewport.backspace_at_active_position();
+                        auto td = viewport.backspace_at_active_position();
+                        if (td != EMPTY_TEXT_DIFF) {
+                            lsp_client.make_did_change_request(viewport.buffer->current_file_path, td);
+                        }
                     }
                 }
                 break;
             case GLFW_KEY_TAB:
                 if (current_mode == INSERT) {
-                    viewport.insert_tab_at_cursor();
+                    auto td = viewport.insert_tab_at_cursor();
+                    if (td != EMPTY_TEXT_DIFF) {
+                        lsp_client.make_did_change_request(viewport.buffer->current_file_path, td);
+                    }
                 }
                 break;
             case GLFW_KEY_Y:
                 if (current_mode == VISUAL_SELECT) {
-                    std::string curr_sel = viewport.buffer.get_bounding_box_string(
+                    std::string curr_sel = viewport.buffer->get_bounding_box_string(
                         line_where_selection_mode_started, col_where_selection_mode_started,
                         viewport.active_buffer_line_under_cursor, viewport.active_buffer_col_under_cursor);
                     glfwSetClipboardString(window.glfw_window, curr_sel.c_str());
@@ -1534,6 +1567,8 @@ int main(int argc, char *argv[]) {
         glfwSwapBuffers(window.glfw_window);
         glfwPollEvents();
     }
+
+    thread.detach();
 
     glfwDestroyWindow(window.glfw_window);
 

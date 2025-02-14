@@ -2,7 +2,7 @@
 
 #include <cctype> // For std::isalnum
 
-Viewport::Viewport(LineTextBuffer &initial_buffer, int num_lines, int num_cols, int cursor_line_offset,
+Viewport::Viewport(std::shared_ptr<LineTextBuffer> initial_buffer, int num_lines, int num_cols, int cursor_line_offset,
                    int cursor_col_offset)
     : buffer(initial_buffer), cursor_line_offset(cursor_line_offset), num_lines(num_lines), num_cols(num_cols),
       cursor_col_offset(cursor_col_offset), active_buffer_line_under_cursor(0), active_buffer_col_under_cursor(0),
@@ -13,26 +13,26 @@ Viewport::Viewport(LineTextBuffer &initial_buffer, int num_lines, int num_cols, 
     active_file_buffers.push_back(initial_buffer);
 }
 
-void Viewport::switch_buffers_and_adjust_viewport_position(LineTextBuffer &ltb, bool store_movement_to_history) {
+void Viewport::switch_buffers_and_adjust_viewport_position(std::shared_ptr<LineTextBuffer> ltb,
+                                                           bool store_movement_to_history) {
     // Save the current active position before switching
-    if (!buffer.current_file_path.empty()) {
-        file_name_to_last_viewport_position[buffer.current_file_path] =
+    if (!buffer->current_file_path.empty()) {
+        file_name_to_last_viewport_position[buffer->current_file_path] =
             std::make_tuple(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
     }
 
-    // Switch to the new buffer
     buffer = ltb;
 
-    // Add the buffer to active_file_buffers if it's not already present
-    auto it_buffer = std::find_if(active_file_buffers.begin(), active_file_buffers.end(), [&](const LineTextBuffer &b) {
-        return b.current_file_path == ltb.current_file_path;
-    });
+    auto it_buffer = std::find_if(
+        active_file_buffers.begin(), active_file_buffers.end(),
+        [&](const std::shared_ptr<LineTextBuffer> &b) { return b->current_file_path == ltb->current_file_path; });
+
     if (it_buffer == active_file_buffers.end()) {
         active_file_buffers.push_back(ltb);
     }
 
     // restore the last cursor position if available
-    auto it = file_name_to_last_viewport_position.find(ltb.current_file_path);
+    auto it = file_name_to_last_viewport_position.find(ltb->current_file_path);
     if (it != file_name_to_last_viewport_position.end()) {
         auto [line, col] = it->second;
         set_active_buffer_line_col_under_cursor(line, col, store_movement_to_history);
@@ -106,7 +106,7 @@ void Viewport::set_active_buffer_line_col_under_cursor(int line, int col, bool s
     active_buffer_col_under_cursor = col;
     moved_signal.toggle_state();
     if (store_pos_to_history) {
-        history.add_flc_to_history(buffer.current_file_path, active_buffer_line_under_cursor,
+        history.add_flc_to_history(buffer->current_file_path, active_buffer_line_under_cursor,
                                    active_buffer_col_under_cursor);
     }
 };
@@ -124,7 +124,7 @@ char Viewport::get_symbol_at(int line, int col) const {
     int column_index = active_buffer_col_under_cursor + col - cursor_col_offset;
 
     // Check if the line index is within bounds
-    if (line_index < buffer.line_count() && line_index >= 0) {
+    if (line_index < buffer->line_count() && line_index >= 0) {
         if (column_index < 0) {
             // Handle negative column indices: Render line number
             std::string line_number = std::to_string(line_index + 1) + "|";
@@ -137,7 +137,7 @@ char Viewport::get_symbol_at(int line, int col) const {
             }
         } else {
             // Handle non-negative column indices: Render buffer content
-            const std::string &line_content = buffer.get_line(line_index);
+            const std::string &line_content = buffer->get_line(line_index);
             if (column_index < line_content.size()) {
                 return line_content[column_index];
             }
@@ -146,61 +146,59 @@ char Viewport::get_symbol_at(int line, int col) const {
     return ' '; // Placeholder for out-of-bounds positions
 }
 
-bool Viewport::delete_character_at_active_position() {
-    if (buffer.delete_character(active_buffer_line_under_cursor, active_buffer_col_under_cursor)) {
-        return true;
-    }
-    return false;
+TextDiff Viewport::delete_character_at_active_position() {
+    return buffer->delete_character(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
 }
 
-bool Viewport::backspace_at_active_position() {
-    if (buffer.delete_character(active_buffer_line_under_cursor, active_buffer_col_under_cursor - 1)) {
+TextDiff Viewport::backspace_at_active_position() {
+    auto td = buffer->delete_character(active_buffer_line_under_cursor, active_buffer_col_under_cursor - 1);
+    if (td != EMPTY_TEXT_DIFF) {
         scroll_left();
-        return true;
     }
-    return false;
+    return td;
 }
 
-bool Viewport::insert_character_at(int line, int col, char character) {
+TextDiff Viewport::insert_character_at(int line, int col, char character) {
     int line_index = active_buffer_line_under_cursor + line;
     int column_index = active_buffer_col_under_cursor + col;
 
-    if (buffer.insert_character(line_index, column_index, character)) {
+    auto td = buffer->insert_character(line_index, column_index, character);
+
+    if (td != EMPTY_TEXT_DIFF) {
         scroll_right();
-        return true;
     }
-    return false;
+    return td;
 }
 void Viewport::move_cursor_forward_until_end_of_word() {
     active_buffer_col_under_cursor =
-        buffer.find_forward_to_end_of_word(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
+        buffer->find_forward_to_end_of_word(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
     moved_signal.toggle_state();
 }
 void Viewport::move_cursor_forward_until_next_right_bracket() {
-    active_buffer_col_under_cursor =
-        buffer.find_column_index_of_next_right_bracket(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
+    active_buffer_col_under_cursor = buffer->find_column_index_of_next_right_bracket(active_buffer_line_under_cursor,
+                                                                                     active_buffer_col_under_cursor);
     moved_signal.toggle_state();
 }
 void Viewport::move_cursor_backward_until_next_left_bracket() {
-    active_buffer_col_under_cursor = buffer.find_column_index_of_previous_left_bracket(active_buffer_line_under_cursor,
-                                                                                       active_buffer_col_under_cursor);
+    active_buffer_col_under_cursor = buffer->find_column_index_of_previous_left_bracket(active_buffer_line_under_cursor,
+                                                                                        active_buffer_col_under_cursor);
     moved_signal.toggle_state();
 }
 void Viewport::move_cursor_forward_by_word() {
     active_buffer_col_under_cursor =
-        buffer.find_forward_by_word_index(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
+        buffer->find_forward_by_word_index(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
     moved_signal.toggle_state();
 }
 
 void Viewport::move_cursor_backward_until_start_of_word() {
     active_buffer_col_under_cursor =
-        buffer.find_backward_to_start_of_word(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
+        buffer->find_backward_to_start_of_word(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
     moved_signal.toggle_state();
 }
 
 void Viewport::move_cursor_backward_by_word() {
     active_buffer_col_under_cursor =
-        buffer.find_backward_by_word_index(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
+        buffer->find_backward_by_word_index(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
     moved_signal.toggle_state();
 }
 
@@ -209,12 +207,12 @@ bool Viewport::delete_line_at_cursor() {
     int line_index = active_buffer_line_under_cursor;
 
     // Ensure the line index is valid within the buffer's bounds
-    if (line_index < 0 || line_index >= buffer.line_count()) {
+    if (line_index < 0 || line_index >= buffer->line_count()) {
         return false;
     }
 
     // Delete the line at the current cursor position
-    if (!buffer.delete_line(line_index)) {
+    if (!buffer->delete_line(line_index)) {
         return false;
     }
 
@@ -230,30 +228,29 @@ bool Viewport::delete_line_at_cursor() {
 void Viewport::move_cursor_to_start_of_line() {
     int line_index = active_buffer_line_under_cursor;
 
-    if (line_index < buffer.line_count()) {
+    if (line_index < buffer->line_count()) {
         active_buffer_col_under_cursor = 0; // Move the cursor to the start of the line
     }
 
     moved_signal.toggle_state();
 }
 
-bool Viewport::insert_tab_at_cursor() {
+TextDiff Viewport::insert_tab_at_cursor() {
     // Insert a tab at the current cursor position in the buffer
-    bool insert_result = buffer.insert_tab(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
+    auto td = buffer->insert_tab(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
 
-    // If insertion is successful, perform scrolling
-    if (insert_result) {
-        scroll(0, 4); // scroll right by four
+    if (td != EMPTY_TEXT_DIFF) {
+        scroll(0, buffer->TAB.size());
     }
 
-    return insert_result; // Return the result of the insert operation
+    return td;
 }
 
 void Viewport::move_cursor_to_end_of_line() {
     int line_index = active_buffer_line_under_cursor;
 
-    if (line_index < buffer.line_count()) {
-        const std::string &line = buffer.get_line(line_index);
+    if (line_index < buffer->line_count()) {
+        const std::string &line = buffer->get_line(line_index);
         active_buffer_col_under_cursor = line.size(); // Move the cursor to the end of the line
     }
 
@@ -263,70 +260,46 @@ void Viewport::move_cursor_to_end_of_line() {
 void Viewport::move_cursor_to_middle_of_line() {
     int line_index = active_buffer_line_under_cursor;
 
-    if (line_index < buffer.line_count()) {
-        const std::string &line = buffer.get_line(line_index);
+    if (line_index < buffer->line_count()) {
+        const std::string &line = buffer->get_line(line_index);
         active_buffer_col_under_cursor = line.size() / 2; // Move the cursor to the middle of the line
     }
 
     moved_signal.toggle_state();
 }
 
-bool Viewport::create_new_line_above_cursor_and_scroll_up() {
-    // Get the current cursor position
-    int line_index = active_buffer_line_under_cursor;
+TextDiff Viewport::create_new_line_above_cursor_and_scroll_up() {
+    auto td = buffer->insert_new_line(active_buffer_line_under_cursor);
 
-    // Ensure the line index is valid within the buffer's bounds
-    if (line_index < 0 || line_index > buffer.line_count()) {
-        return false;
-    }
-
-    // Insert the new line at the correct position in the buffer
-    if (!buffer.insert_blank_line(line_index)) {
-        return false;
-    }
-
-    // I actualy realized no scrolling is reqiured because it pushes everything down, potential torename func
-
+    // TODO: I actualy realized no scrolling is reqiured because it pushes everything down, potentially rename func
     set_active_buffer_col_under_cursor(0);
-    // Optionally: Adjust any other properties related to the cursor or viewport
-    // after inserting the new line, such as moving the cursor to the beginning of the new line.
 
-    return true;
+    return td;
 }
 
-bool Viewport::create_new_line_at_cursor_and_scroll_down() {
-    // Get the current cursor position
+const TextDiff Viewport::create_new_line_at_cursor_and_scroll_down() {
     int line_index = active_buffer_line_under_cursor;
+    auto const td = buffer->insert_new_line(line_index + 1);
 
-    // Ensure the line index is valid within the buffer's bounds
-    if (line_index < 0 || line_index > buffer.line_count()) {
-        return false;
+    if (td != EMPTY_TEXT_DIFF) {
+        scroll_down();
+        // and move to the start of the line as well
+        set_active_buffer_col_under_cursor(0);
+        // Optionally: Adjust any other properties related to the cursor or viewport
+        // after inserting the new line, such as moving the cursor to the beginning of the new line.
     }
 
-    // Insert the new line at the correct position in the buffer
-    if (!buffer.insert_blank_line(line_index + 1)) {
-        return false;
-    }
-
-    scroll_down();
-    // and move to the start of the line as well
-    set_active_buffer_col_under_cursor(0);
-    // Optionally: Adjust any other properties related to the cursor or viewport
-    // after inserting the new line, such as moving the cursor to the beginning of the new line.
-
-    return true;
+    return td;
 }
 
-bool Viewport::insert_character_at_cursor(char character) {
-    if (buffer.insert_character(active_buffer_line_under_cursor, active_buffer_col_under_cursor, character)) {
-        scroll_right();
-        return true;
-    }
-    return false;
+TextDiff Viewport::insert_character_at_cursor(char character) {
+    auto td = buffer->insert_character(active_buffer_line_under_cursor, active_buffer_col_under_cursor, character);
+    scroll_right();
+    return td;
 }
 
 bool Viewport::insert_string_at_cursor(const std::string &str) {
-    if (buffer.insert_string(active_buffer_line_under_cursor, active_buffer_col_under_cursor, str)) {
+    if (buffer->insert_string(active_buffer_line_under_cursor, active_buffer_col_under_cursor, str)) {
         scroll(0, str.size());
         return true;
     }
