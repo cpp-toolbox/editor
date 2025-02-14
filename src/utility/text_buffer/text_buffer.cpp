@@ -95,7 +95,8 @@ TextDiff LineTextBuffer::insert_character(int line_index, int col_index, char ch
     // TODO: using the legacy diff here, change when we use diffs better
     undo_stack.push(Diff(Diff::Type::INSERT, line_index, col_index, std::string(1, character)));
 
-    auto td = TextDiff({line_index, col_index, line_index, col_index + 1}, std::string(1, character));
+    auto td = create_insertion_diff(line_index, col_index, std::string(1, character));
+    /*TextDiff({line_index, col_index, line_index, col_index + 1}, std::string(1, character));*/
 
     // Toggle edit signal and mark as modified
     edit_signal.toggle_state();

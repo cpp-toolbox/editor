@@ -409,7 +409,7 @@ void switch_files(Viewport &viewport, LSPClient &lsp_client, const std::string &
     if (not found_active_file_buffer) {
         std::cout << "didn't find matching buffer creating new buffer for: " << file_to_open << std::endl;
         auto ltb = std::make_shared<LineTextBuffer>();
-        ltb->load_file(file_to_open);
+        ltb->load_file(lsp_client.get_full_path(file_to_open));
         lsp_client.make_did_open_request(file_to_open);
         viewport.switch_buffers_and_adjust_viewport_position(ltb, store_movements_to_history);
     }
@@ -810,6 +810,12 @@ void run_key_logic(InputState &input_state, EditorMode &current_mode, TemporalBi
                 lsp_client.make_go_to_definition_request(viewport.buffer->current_file_path,
                                                          viewport.active_buffer_line_under_cursor,
                                                          viewport.active_buffer_col_under_cursor, on_definition_found);
+
+                auto tr =
+                    TextRange(viewport.active_buffer_line_under_cursor, 0, viewport.active_buffer_line_under_cursor,
+                              viewport.buffer->get_line(viewport.active_buffer_line_under_cursor).length());
+
+                /*lsp_client.make_get_text_request(viewport.buffer->current_file_path, tr);*/
             }
         });
         rcr.add_regex("^dd", [&](const std::smatch &m) {
