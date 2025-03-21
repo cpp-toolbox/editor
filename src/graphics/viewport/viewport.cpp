@@ -146,11 +146,11 @@ char Viewport::get_symbol_at(int line, int col) const {
     return ' '; // Placeholder for out-of-bounds positions
 }
 
-TextDiff Viewport::delete_character_at_active_position() {
+TextModification Viewport::delete_character_at_active_position() {
     return buffer->delete_character(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
 }
 
-TextDiff Viewport::backspace_at_active_position() {
+TextModification Viewport::backspace_at_active_position() {
     auto td = buffer->delete_character(active_buffer_line_under_cursor, active_buffer_col_under_cursor - 1);
     if (td != EMPTY_TEXT_DIFF) {
         scroll_left();
@@ -158,7 +158,7 @@ TextDiff Viewport::backspace_at_active_position() {
     return td;
 }
 
-TextDiff Viewport::insert_character_at(int line, int col, char character) {
+TextModification Viewport::insert_character_at(int line, int col, char character) {
     int line_index = active_buffer_line_under_cursor + line;
     int column_index = active_buffer_col_under_cursor + col;
 
@@ -202,27 +202,15 @@ void Viewport::move_cursor_backward_by_word() {
     moved_signal.toggle_state();
 }
 
-bool Viewport::delete_line_at_cursor() {
-    // Get the current cursor position
+TextModification Viewport::delete_line_at_cursor() {
     int line_index = active_buffer_line_under_cursor;
 
-    // Ensure the line index is valid within the buffer's bounds
     if (line_index < 0 || line_index >= buffer->line_count()) {
-        return false;
+        return EMPTY_TEXT_DIFF;
     }
 
-    // Delete the line at the current cursor position
-    if (!buffer->delete_line(line_index)) {
-        return false;
-    }
-
-    // Optionally: Adjust the viewport or cursor position after deletion
-    // For example, move the cursor to the previous line after deletion.
-    /*if (line_index > 0) {*/
-    /*    scroll_up();*/
-    /*}*/
-
-    return true;
+    auto tm = buffer->delete_line(line_index);
+    return tm;
 }
 
 void Viewport::move_cursor_to_start_of_line() {
@@ -235,7 +223,7 @@ void Viewport::move_cursor_to_start_of_line() {
     moved_signal.toggle_state();
 }
 
-TextDiff Viewport::insert_tab_at_cursor() {
+TextModification Viewport::insert_tab_at_cursor() {
     // Insert a tab at the current cursor position in the buffer
     auto td = buffer->insert_tab(active_buffer_line_under_cursor, active_buffer_col_under_cursor);
 
@@ -268,8 +256,8 @@ void Viewport::move_cursor_to_middle_of_line() {
     moved_signal.toggle_state();
 }
 
-TextDiff Viewport::create_new_line_above_cursor_and_scroll_up() {
-    auto td = buffer->insert_new_line(active_buffer_line_under_cursor);
+TextModification Viewport::create_new_line_above_cursor_and_scroll_up() {
+    auto td = buffer->insert_newline_after_this_line(active_buffer_line_under_cursor);
 
     // TODO: I actualy realized no scrolling is reqiured because it pushes everything down, potentially rename func
     set_active_buffer_col_under_cursor(0);
@@ -277,9 +265,9 @@ TextDiff Viewport::create_new_line_above_cursor_and_scroll_up() {
     return td;
 }
 
-const TextDiff Viewport::create_new_line_at_cursor_and_scroll_down() {
+const TextModification Viewport::create_new_line_at_cursor_and_scroll_down() {
     int line_index = active_buffer_line_under_cursor;
-    auto const td = buffer->insert_new_line(line_index + 1);
+    auto const td = buffer->insert_newline_after_this_line(line_index);
 
     if (td != EMPTY_TEXT_DIFF) {
         scroll_down();
@@ -292,16 +280,18 @@ const TextDiff Viewport::create_new_line_at_cursor_and_scroll_down() {
     return td;
 }
 
-TextDiff Viewport::insert_character_at_cursor(char character) {
-    auto td = buffer->insert_character(active_buffer_line_under_cursor, active_buffer_col_under_cursor, character);
+TextModification Viewport::insert_character_at_cursor(char character) {
+    auto tm = buffer->insert_character(active_buffer_line_under_cursor, active_buffer_col_under_cursor, character);
     scroll_right();
-    return td;
+    return tm;
 }
 
-bool Viewport::insert_string_at_cursor(const std::string &str) {
-    if (buffer->insert_string(active_buffer_line_under_cursor, active_buffer_col_under_cursor, str)) {
+TextModification Viewport::insert_string_at_cursor(const std::string &str) {
+    auto tm = buffer->insert_string(active_buffer_line_under_cursor, active_buffer_col_under_cursor, str);
+
+    if (tm != EMPTY_TEXT_DIFF) {
         scroll(0, str.size());
-        return true;
     }
-    return false;
+
+    return tm;
 }

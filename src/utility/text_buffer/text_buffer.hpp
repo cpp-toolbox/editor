@@ -8,25 +8,11 @@
 #include "../temporal_binary_signal/temporal_binary_signal.hpp"
 #include "../text_diff/text_diff.hpp"
 
-// TODO: legacy diff which is being depricated
-class Diff {
-  public:
-    enum class Type { INSERT, REPLACE, DELETE_LINE, DELETE_WITHIN_LINE };
-
-    Type type;
-    int line_index;
-    int col_index;
-    std::string text;
-
-    Diff(Type t, int line, int col, const std::string &text_data)
-        : type(t), line_index(line), col_index(col), text(text_data) {}
-};
-
 class LineTextBuffer {
   private:
     std::vector<std::string> lines;
-    std::stack<Diff> undo_stack;
-    std::stack<Diff> redo_stack;
+    std::stack<TextModification> undo_stack;
+    std::stack<TextModification> redo_stack;
 
   public:
     TemporalBinarySignal edit_signal;
@@ -43,47 +29,54 @@ class LineTextBuffer {
     int line_count() const;
     std::string get_line(int line_index) const;
     std::string get_bounding_box_string(int start_line, int start_col, int end_line, int end_col) const;
+    std::string get_text_from_range(const TextRange &range) const;
+    bool character_is_non_word_character(const std::string &c) const;
 
-    TextDiff delete_character(int line_index, int col_index);
-    bool delete_bounding_box(int start_line, int start_col, int end_line, int end_col);
-    bool delete_line(int line_index);
+    // NOTE: MODIFICATION FUNCTIONS START
 
-    bool replace_line(int line_index, const std::string &new_content);
-    void append_line(const std::string &line);
+    TextModification apply_text_modification(const TextModification &modification);
+    TextModification delete_character(int line_index, int col_index);
+    std::vector<TextModification> delete_bounding_box(int start_line, int start_col, int end_line, int end_col);
+    TextModification delete_line(int line_index);
 
-    TextDiff insert_character(int line_index, int col_index, char character);
-    bool insert_string(int line_index, int col_index, const std::string &str);
-    TextDiff insert_new_line(int line_index);
-    TextDiff insert_tab(int line_index, int col_index);
+    TextModification replace_line(int line_index, const std::string &new_content);
+    TextModification append_line(const std::string &line);
 
-    int find_rightward_index(int line_index, int col_index, char character);
-    int find_leftward_index(int line_index, int col_index, char character);
-    int find_rightward_index_before(int line_index, int col_index, char character);
-    int find_leftward_index_before(int line_index, int col_index, char character);
+    TextModification insert_character(int line_index, int col_index, char character);
+    TextModification insert_string(int line_index, int col_index, const std::string &str);
+    TextModification insert_newline_after_this_line(int line_index);
+    TextModification insert_tab(int line_index, int col_index);
 
-    int find_col_idx_of_first_non_whitespace_character_in_line(int line_index);
+    // NOTE: MODIFICATION FUNCTIONS END
 
-    int find_forward_by_word_index(int line_index, int col_index);
-    int find_forward_to_end_of_word(int line_index, int col_index);
+    int find_rightward_index(int line_index, int col_index, char character) const;
+    int find_leftward_index(int line_index, int col_index, char character) const;
+    int find_rightward_index_before(int line_index, int col_index, char character) const;
+    int find_leftward_index_before(int line_index, int col_index, char character) const;
 
-    int find_column_index_of_next_character(int line_index, int col_index, char target_char);
-    int find_column_index_of_character_leftward(int line_index, int col_index, char target_char);
+    int find_col_idx_of_first_non_whitespace_character_in_line(int line_index) const;
 
-    int find_column_index_of_next_right_bracket(int line_index, int col_index);
-    int find_column_index_of_previous_left_bracket(int linx_index, int col_index);
+    int find_forward_by_word_index(int line_index, int col_index) const;
+    int find_forward_to_end_of_word(int line_index, int col_index) const;
 
-    int find_backward_by_word_index(int line_index, int col_index);
-    int find_backward_to_start_of_word(int line_index, int col_index);
+    int find_column_index_of_next_character(int line_index, int col_index, char target_char) const;
+    int find_column_index_of_character_leftward(int line_index, int col_index, char target_char) const;
 
-    std::vector<TextRange> find_forward_matches(int line_index, int col_index, const std::string &regex_str);
-    std::vector<TextRange> find_backward_matches(int line_index, int col_index, const std::string &regex_str);
+    int find_column_index_of_next_right_bracket(int line_index, int col_index) const;
+    int find_column_index_of_previous_left_bracket(int linx_index, int col_index) const;
+
+    int find_backward_by_word_index(int line_index, int col_index) const;
+    int find_backward_to_start_of_word(int line_index, int col_index) const;
+
+    std::vector<TextRange> find_forward_matches(int line_index, int col_index, const std::string &regex_str) const;
+    std::vector<TextRange> find_backward_matches(int line_index, int col_index, const std::string &regex_str) const;
 
     std::string get_last_deleted_content() const;
 
-    int get_indentation_level(int line, int col);
+    int get_indentation_level(int line, int col) const;
 
-    void undo();
-    void redo();
+    TextModification undo();
+    TextModification redo();
 };
 
 #endif // TEXT_BUFFER_HPP

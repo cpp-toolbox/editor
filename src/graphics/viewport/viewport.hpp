@@ -46,17 +46,17 @@ class Viewport {
     void move_cursor_to_end_of_line();
     void move_cursor_to_middle_of_line();
 
-    TextDiff create_new_line_above_cursor_and_scroll_up();
-    const TextDiff create_new_line_at_cursor_and_scroll_down();
+    TextModification create_new_line_above_cursor_and_scroll_up();
+    const TextModification create_new_line_at_cursor_and_scroll_down();
 
-    TextDiff insert_tab_at_cursor();
-    TextDiff insert_character_at_cursor(char character);
-    bool insert_string_at_cursor(const std::string &str);
-    TextDiff insert_character_at(int line, int col, char character);
+    TextModification insert_tab_at_cursor();
+    TextModification insert_character_at_cursor(char character);
+    TextModification insert_string_at_cursor(const std::string &str);
+    TextModification insert_character_at(int line, int col, char character);
 
-    bool delete_line_at_cursor();
-    TextDiff delete_character_at_active_position();
-    TextDiff backspace_at_active_position();
+    TextModification delete_line_at_cursor();
+    TextModification delete_character_at_active_position();
+    TextModification backspace_at_active_position();
 
     void set_active_buffer_line_col_under_cursor(int line, int col, bool store_pos_to_history = true);
     void set_active_buffer_line_under_cursor(int line, bool store_pos_to_history = true);
