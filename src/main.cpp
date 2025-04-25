@@ -401,7 +401,7 @@ void switch_files(Viewport &viewport, LSPClient &lsp_client, const std::string &
         std::cout << "didn't find matching buffer creating new buffer for: " << file_to_open << std::endl;
         auto ltb = std::make_shared<LineTextBuffer>();
         ltb->load_file(lsp_client.get_full_path(file_to_open));
-        lsp_client.make_did_open_request(file_to_open);
+        // lsp_client.make_did_open_request(file_to_open);
         viewport.switch_buffers_and_adjust_viewport_position(ltb, store_movements_to_history);
     }
 }
@@ -1154,7 +1154,8 @@ int main(int argc, char *argv[]) {
         rp.gfp("C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\Llvm\\bin\\clangd.exe")
             .string());
 #else
-    LSPClient lsp_client("/home/ccn/projects/cpp-toolbox-organization/editor/");
+    // LSPClient lsp_client("/home/ccn/projects/cpp-toolbox-organization/editor/");
+    LSPClient lsp_client("");
 #endif
 
     std::thread thread([&] {
@@ -1229,7 +1230,7 @@ int main(int argc, char *argv[]) {
     };
 
     std::filesystem::path config_path = "~/.tbx_cfg.ini";
-    Configuration config(config_path, section_key_to_config_logic);
+    // Configuration config(config_path, section_key_to_config_logic);
 
     std::cout << username << std::endl;
 
